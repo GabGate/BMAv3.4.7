@@ -1,0 +1,3229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0D1B2A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BMA v3.4r">
+<meta name="description" content="Basketball Matchup Analyzer v3.2 - 3-Game H2H Scoreboard | Full Score Analysis">
+<link rel="manifest" href="manifest.json">
+<title>🏀 Basketball Analyzer v3.4</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --dn: #0D1B2A;
+  --nv: #1A2940;
+  --bl: #1E3A5F;
+  --mb: #2563A8;
+  --lb: #3B82C4;
+  --ac: #F59E0B;
+  --ac2: #FBBF24;
+  --gd: #166534;
+  --gc: #DCFCE7;
+  --gf: #16A34A;
+  --yd: #92400E;
+  --yc: #FEF9C3;
+  --yf: #D97706;
+  --rd: #991B1B;
+  --rc: #FEE2E2;
+  --rf: #DC2626;
+  --pu: #6D28D9;
+  --pc: #EDE9FE;
+  --or: #EA580C;
+  --wh: #FFFFFF;
+  --ow: #F8FAFC;
+  --lg: #E2E8F0;
+  --mg: #94A3B8;
+  --dg: #334155;
+  --ib: #EFF6FF;
+  --cb: #F0FDF4;
+  --ob: #FFF7ED;
+  --safe: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--dn);
+  color: var(--wh);
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: calc(70px + var(--safe));
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: linear-gradient(135deg, var(--dn) 0%, #0F2337 100%);
+  border-bottom: 2px solid var(--ac);
+  padding: 10px 16px 8px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.topbar-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px; font-weight: 900;
+  color: var(--ac); letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.topbar-sub { font-size: 10px; color: var(--mg); margin-top: 1px; }
+.topbar-badge {
+  background: var(--ac); color: var(--dn);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 800;
+  padding: 3px 8px; border-radius: 20px;
+}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: linear-gradient(180deg, #0A1520 0%, var(--dn) 100%);
+  border-top: 1px solid #1E3A5F;
+  display: flex;
+  padding-bottom: var(--safe);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 8px 4px; border: none; background: none;
+  color: var(--mg); cursor: pointer;
+  transition: color .2s; font-family: 'Barlow', sans-serif;
+}
+.nav-btn.active { color: var(--ac); }
+.nav-btn .nav-icon { font-size: 20px; line-height: 1; }
+.nav-btn .nav-label { font-size: 10px; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── PAGES ── */
+.page { display: none; padding: 12px; }
+.page.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: linear-gradient(135deg, var(--nv) 0%, #16243A 100%);
+  border: 1px solid #253A55;
+  border-radius: 12px; margin-bottom: 12px;
+  overflow: hidden;
+}
+.card-header {
+  background: linear-gradient(135deg, var(--bl) 0%, var(--mb) 100%);
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-header.amber { background: linear-gradient(135deg, #92400E 0%, #B45309 100%); }
+.card-header.green { background: linear-gradient(135deg, #14532D 0%, #166534 100%); }
+.card-header.purple { background: linear-gradient(135deg, #4C1D95 0%, #6D28D9 100%); }
+.card-header.red { background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); }
+.card-header-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.card-body { padding: 12px; }
+
+/* ── LEAGUE SELECTOR ── */
+.league-select-wrap { position: relative; }
+.league-select {
+  width: 100%; padding: 10px 36px 10px 12px;
+  background: var(--ib); border: 2px solid var(--mb);
+  border-radius: 8px; color: var(--bl);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px; font-weight: 700;
+  appearance: none; -webkit-appearance: none;
+  cursor: pointer;
+}
+.select-arrow {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--mb); pointer-events: none; font-size: 14px;
+}
+
+/* ── TEAM INPUT GRID ── */
+.team-header {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.team-header.a { color: var(--ac); }
+.team-header.b { color: var(--lb); }
+
+.team-name-input {
+  width: 100%; padding: 8px 12px;
+  background: var(--ib); border: 2px solid var(--mb);
+  border-radius: 8px; color: var(--bl);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 700;
+  margin-bottom: 10px;
+}
+.team-name-input::placeholder { color: var(--mg); }
+
+.game-row { margin-bottom: 10px; }
+.game-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700;
+  color: var(--mg); text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 4px;
+}
+.input-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.input-grid-3 {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.input-group { display: flex; flex-direction: column; gap: 3px; }
+.input-label {
+  font-size: 10px; font-weight: 600;
+  color: var(--mg); text-transform: uppercase; letter-spacing: .3px;
+}
+.input-field {
+  width: 100%; padding: 9px 10px;
+  background: var(--ib); border: 1.5px solid #CBD5E1;
+  border-radius: 7px; color: var(--dn);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 700;
+  transition: border-color .2s;
+}
+.input-field:focus { outline: none; border-color: var(--mb); background: #DBEAFE; }
+.input-field.calc {
+  background: var(--cb); border-color: var(--gf);
+  color: var(--gd);
+}
+.input-field.pct { color: var(--rd); }
+
+.total-pts-display {
+  background: var(--cb); border: 1.5px solid var(--gf);
+  border-radius: 7px; padding: 9px 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800;
+  color: var(--gd); text-align: center;
+}
+
+/* ── DATA CHECK BANNER ── */
+.data-check {
+  border-radius: 8px; padding: 10px 14px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700;
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.data-check.ok { background: var(--gc); color: var(--gd); border: 1.5px solid var(--gf); }
+.data-check.bad { background: var(--rc); color: var(--rd); border: 1.5px solid var(--rf); }
+
+/* ── RATING DISPLAY ── */
+.rating-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rating-item {
+  background: var(--dn); border-radius: 8px;
+  padding: 10px; border: 1px solid #253A55;
+}
+.rating-item-label {
+  font-size: 10px; font-weight: 600; color: var(--mg);
+  text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px;
+}
+.rating-item-bar {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.rating-bar-track {
+  flex: 1; height: 6px; background: #1E3A5F; border-radius: 3px; overflow: hidden;
+}
+.rating-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--mb), var(--ac));
+  transition: width .4s ease;
+}
+.rating-score {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px; font-weight: 900; color: var(--ac);
+}
+.rating-max { font-size: 11px; color: var(--mg); }
+
+/* ── SCORE DISPLAY ── */
+.score-display {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.score-box {
+  flex: 1; border-radius: 10px; padding: 14px 10px;
+  text-align: center; border: 2px solid transparent;
+}
+.score-box.team-a { background: linear-gradient(135deg, var(--bl), #2A4A70); border-color: var(--ac); }
+.score-box.team-b { background: linear-gradient(135deg, var(--mb), #3B72C4); border-color: var(--lb); }
+.score-box.combined { background: linear-gradient(135deg, #0F2337, #1A3050); border-color: var(--ac); }
+.score-box-label {
+  font-size: 10px; font-weight: 600; color: var(--mg);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
+}
+.score-box-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 800; color: var(--wh);
+  margin-bottom: 6px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.score-box-number {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 36px; font-weight: 900; line-height: 1;
+  color: var(--ac);
+}
+.score-box-denom { font-size: 13px; color: var(--mg); }
+
+/* ── CLASSIFICATION PILL ── */
+.classification {
+  border-radius: 10px; padding: 14px;
+  text-align: center; margin-bottom: 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px; font-weight: 900;
+  letter-spacing: 1px; text-transform: uppercase;
+  border: 2px solid transparent;
+}
+.classification.fast { background: linear-gradient(135deg, #14532D, #166534); border-color: #16A34A; color: #DCFCE7; }
+.classification.mixed { background: linear-gradient(135deg, #78350F, #92400E); border-color: #D97706; color: #FEF9C3; }
+.classification.slow { background: linear-gradient(135deg, #7F1D1D, #991B1B); border-color: #DC2626; color: #FEE2E2; }
+.classification.invalid { background: linear-gradient(135deg, #1E293B, #334155); border-color: #475569; color: #94A3B8; }
+
+/* ── ALERT ITEMS ── */
+.alert-item {
+  border-radius: 8px; padding: 10px 12px;
+  margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+}
+.alert-item.warn { background: var(--yc); color: var(--yd); border: 1.5px solid var(--yf); }
+.alert-item.ok   { background: var(--gc); color: var(--gd); border: 1.5px solid var(--gf); }
+.alert-item.err  { background: var(--rc); color: var(--rd); border: 1.5px solid var(--rf); }
+.alert-item.info { background: var(--pc); color: var(--pu); border: 1.5px solid #8B5CF6; }
+.alert-item.blue { background: #DBEAFE; color: var(--bl); border: 1.5px solid var(--mb); }
+.alert-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .5px;
+  display: block; margin-bottom: 2px; opacity: .7;
+}
+
+/* ── SUGGESTION BOX ── */
+.suggestion-main {
+  border-radius: 10px; padding: 16px;
+  margin-bottom: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 800;
+  line-height: 1.3; border: 2px solid var(--ac);
+  background: linear-gradient(135deg, #1A2F1A, #0F2337);
+}
+.suggestion-secondary {
+  border-radius: 8px; padding: 12px;
+  margin-bottom: 8px;
+  font-size: 13px; font-weight: 500;
+  background: var(--nv); border: 1px solid #253A55;
+  color: var(--lg);
+}
+
+/* ── TRAP METERS ── */
+.meter-row {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.meter-box {
+  flex: 1; background: var(--dn); border-radius: 10px;
+  padding: 12px; text-align: center;
+  border: 1.5px solid #253A55;
+}
+.meter-label {
+  font-size: 10px; font-weight: 600; color: var(--mg);
+  text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px;
+}
+.meter-value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px; font-weight: 900;
+}
+.meter-value.trap { color: var(--yf); }
+.meter-value.conf { color: var(--gf); }
+.meter-value.danger { color: var(--rf); }
+
+/* ── Q1 TRACKER ── */
+.q1-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.q1-result {
+  border-radius: 8px; padding: 12px;
+  background: var(--dn); border: 1px solid #253A55;
+  text-align: center;
+}
+.q1-result-label { font-size: 10px; color: var(--mg); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
+.q1-result-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px; font-weight: 900; color: var(--ac);
+}
+
+/* ── FIXTURE LOG ── */
+.fixture-item {
+  border-radius: 10px; padding: 12px;
+  margin-bottom: 8px;
+  background: var(--nv); border: 1px solid #253A55;
+}
+.fixture-top {
+  display: flex; justify-content: space-between;
+  align-items: flex-start; margin-bottom: 8px;
+}
+.fixture-teams {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800; color: var(--wh);
+}
+.fixture-date { font-size: 11px; color: var(--mg); }
+.fixture-scores { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.fixture-score-chip {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700;
+  padding: 3px 8px; border-radius: 6px;
+  background: var(--dn); color: var(--mg);
+}
+.fixture-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 800;
+  padding: 4px 10px; border-radius: 6px;
+  text-transform: uppercase;
+}
+.fixture-badge.fast { background: var(--gc); color: var(--gd); }
+.fixture-badge.mixed { background: var(--yc); color: var(--yd); }
+.fixture-badge.slow { background: var(--rc); color: var(--rd); }
+.fixture-badge.invalid { background: var(--lg); color: var(--dg); }
+.fixture-delete {
+  background: none; border: none; color: var(--mg);
+  font-size: 18px; cursor: pointer; padding: 4px;
+  line-height: 1;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  width: 100%; padding: 14px;
+  border: none; border-radius: 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; transition: transform .1s, opacity .2s;
+}
+.btn:active { transform: scale(0.98); opacity: .9; }
+.btn-primary { background: linear-gradient(135deg, var(--mb), var(--lb)); color: var(--wh); }
+.btn-accent  { background: linear-gradient(135deg, var(--ac), var(--ac2)); color: var(--dn); }
+.btn-danger  { background: linear-gradient(135deg, var(--rd), var(--rf)); color: var(--wh); }
+.btn-ghost   { background: transparent; border: 2px solid var(--mg); color: var(--mg); }
+
+/* ── TABS ── */
+.tab-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.tab-btn {
+  flex: 1; padding: 8px 4px;
+  background: var(--nv); border: 1.5px solid #253A55;
+  border-radius: 8px; color: var(--mg);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.tab-btn.active { background: var(--mb); border-color: var(--mb); color: var(--wh); }
+
+/* ── MISC ── */
+.section-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--mg); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 1px; background: #1E3A5F;
+}
+.empty-state {
+  text-align: center; padding: 32px 16px;
+  color: var(--mg);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; font-weight: 500; }
+
+.divider { height: 1px; background: #1E3A5F; margin: 12px 0; }
+.small-note {
+  font-size: 11px; color: var(--mg); text-align: center;
+  padding: 8px; line-height: 1.5;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--gd); color: var(--wh);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700;
+  padding: 10px 20px; border-radius: 20px;
+  z-index: 999; opacity: 0; transition: opacity .3s;
+  white-space: nowrap; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* ── SCROLL RESTORE ── */
+.page { animation: fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── H2H INPUT ── */
+.h2h-row { display: flex; align-items: center; gap: 10px; }
+.h2h-row .input-field { flex: 1; }
+.h2h-bonus-chip {
+  background: var(--ob); color: var(--or);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 900;
+  padding: 9px 14px; border-radius: 7px;
+  border: 1.5px solid var(--or); white-space: nowrap;
+}
+
+/* ── LEAGUE RANGE CHIP ── */
+.league-range-chip {
+  background: var(--ib); color: var(--mb);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700;
+  padding: 6px 12px; border-radius: 20px;
+  border: 1.5px solid var(--lb);
+  display: inline-block; margin-top: 6px;
+}
+
+/* ── v3.1: MODAL OVERLAY ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.80); backdrop-filter: blur(6px);
+  overflow-y: auto; padding: 16px;
+}
+.modal-overlay.active { display: block; }
+.modal-box {
+  background: linear-gradient(135deg, var(--nv) 0%, #16243A 100%);
+  border: 1px solid #253A55; border-radius: 14px;
+  max-width: 520px; margin: 0 auto; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal-header {
+  background: linear-gradient(135deg, var(--bl) 0%, var(--mb) 100%);
+  padding: 13px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid #253A55;
+}
+.modal-header-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px; color: #fff;
+}
+.modal-close {
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; font-size: 18px; width: 30px; height: 30px;
+  border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-body { padding: 14px; }
+.modal-section-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: var(--mg); margin: 10px 0 5px;
+  padding-bottom: 4px; border-bottom: 1px solid #1E3A5F;
+}
+
+/* ── v3.1: RESET BUTTON ── */
+.btn-reset {
+  background: linear-gradient(135deg, #374151, #4B5568);
+  color: var(--wh);
+}
+.btn-row-split { display: flex; gap: 8px; margin-bottom: 8px; }
+.btn-row-split .btn-accent { flex: 1; }
+.btn-row-split .btn-reset { width: 130px; flex-shrink: 0; }
+
+/* ── v3.1: PRINT BUTTON ── */
+.btn-print {
+  background: linear-gradient(135deg, #065F46, #059669);
+  color: var(--wh);
+}
+.log-top-row {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 10px; gap: 8px;
+}
+.log-top-row .section-title { margin-bottom: 0; flex: 1; }
+.log-btn-group { display: flex; gap: 6px; }
+.log-btn-group .btn {
+  width: auto; padding: 7px 13px;
+  font-size: 12px; font-weight: 800;
+}
+
+/* ── v3.1: FIXTURE ITEM tap hint ── */
+.fixture-item { cursor: pointer; transition: border-color .15s, transform .1s; }
+.fixture-item:active { transform: scale(.99); border-color: var(--ac) !important; }
+.fixture-tap-hint { font-size: 10px; color: var(--lb); margin-top: 5px; font-style: italic; }
+
+/* ── v3.1: PREDICTIONS PAGE ── */
+.pred-date-banner {
+  text-align: center; margin-bottom: 14px;
+  padding: 14px; background: linear-gradient(135deg, #0D1B2A, #1A2940);
+  border: 1px solid #253A55; border-radius: 12px;
+}
+.pred-date-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px; font-weight: 900; letter-spacing: 2px; color: var(--ac);
+}
+.pred-date-sub { font-size: 11px; color: var(--mg); margin-top: 2px; letter-spacing: .5px; }
+
+.pred-card {
+  background: linear-gradient(135deg, var(--nv), #16243A);
+  border: 1px solid #253A55; border-radius: 12px;
+  margin-bottom: 14px; overflow: hidden;
+}
+.pred-card-hd {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #1E3A5F;
+}
+.pred-match {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 800; color: var(--wh); margin-bottom: 2px;
+}
+.pred-league-line { font-size: 10px; color: var(--mg); margin-bottom: 8px; letter-spacing: .3px; }
+.pred-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.pred-pill {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 800; letter-spacing: .5px;
+  padding: 5px 12px; border-radius: 8px; display: flex; align-items: center; gap: 5px;
+}
+.pill-over  { background: rgba(22,163,74,.15);  color: #6EE7B7; border: 1.5px solid #16A34A; }
+.pill-under { background: rgba(220,38,38,.12);  color: #FCA5A5; border: 1.5px solid #DC2626; }
+.pill-home  { background: rgba(37,99,168,.15);  color: #93C5FD; border: 1.5px solid var(--mb); }
+.pill-away  { background: rgba(109,40,217,.12); color: #C4B5FD; border: 1.5px solid #7C3AED; }
+.pill-ah    { background: rgba(6,182,212,.12);  color: #A5F3FC; border: 1.5px solid #0891B2; }
+.pill-avoid { background: rgba(100,116,139,.1); color: var(--mg); border: 1.5px solid #475569; }
+.pill-label { font-size: 10px; opacity: .65; }
+.pred-conf-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--mg);
+}
+.conf-bar-track { flex: 1; height: 5px; background: #1E3A5F; border-radius: 3px; overflow: hidden; }
+.conf-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.pred-stars { letter-spacing: 1px; }
+.pred-body { padding: 12px 14px; }
+.pred-main-call {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px; font-weight: 800; color: var(--wh); margin-bottom: 10px;
+  padding: 10px 12px; background: rgba(245,158,11,.07);
+  border: 1px solid rgba(245,158,11,.2); border-radius: 8px; line-height: 1.3;
+}
+.pred-reasons-title {
+  font-size: 10px; font-weight: 700; color: var(--mg);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 7px;
+}
+.pred-reason-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid rgba(30,58,92,.5);
+  font-size: 12px; color: var(--mg); line-height: 1.5;
+}
+.pred-reason-item:last-child { border-bottom: none; }
+.reason-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.pred-meta-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+  padding: 8px 10px; background: rgba(0,0,0,.2); border-radius: 8px;
+}
+.pred-meta-item { font-size: 10px; color: var(--mg); }
+.pred-meta-item b { color: var(--wh); }
+.pred-empty-state { text-align: center; padding: 40px 20px; color: var(--mg); }
+.pred-empty-icon { font-size: 44px; margin-bottom: 12px; }
+.pred-empty-text { font-size: 13px; line-height: 1.7; }
+
+/* ── PRINT STYLES ── */
+@media print {
+  .topbar, .bottom-nav, .no-print, .toast, .modal-overlay { display: none !important; }
+  body { background: #fff !important; color: #000 !important; padding: 0 !important; }
+  #print-area { display: block !important; }
+  .page { display: none !important; }
+}
+#print-area { display: none; }
+
+/* ── v3.2: H2H SCOREBOARD ── */
+.h2h-section { margin-top: 4px; }
+.h2h-game-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.h2h-score-input {
+  width: 100%; padding: 9px 8px;
+  background: var(--ib); border: 1.5px solid #CBD5E1;
+  border-radius: 7px; color: var(--dn);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 800;
+  text-align: center;
+  transition: border-color .2s;
+}
+.h2h-score-input:focus { outline: none; border-color: var(--mb); background: #DBEAFE; }
+.h2h-score-input.winner { border-color: var(--gf); background: var(--gc); color: var(--gd); }
+.h2h-score-input.loser  { border-color: #CBD5E1; background: #F8FAFC; color: #94A3B8; }
+.h2h-vs-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 800;
+  color: var(--mg); text-align: center;
+  background: rgba(0,0,0,.1); border-radius: 4px;
+  padding: 4px 6px; white-space: nowrap;
+}
+.h2h-total-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 800;
+  padding: 8px 10px; border-radius: 7px;
+  text-align: center; white-space: nowrap;
+  background: var(--cb); color: var(--gd);
+  border: 1.5px solid var(--gf);
+  min-width: 62px;
+}
+.h2h-summary-box {
+  background: rgba(0,0,0,.15);
+  border: 1px solid #1E3A5F;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  text-align: center;
+}
+.h2h-sum-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px; font-weight: 900;
+  line-height: 1; margin-bottom: 2px;
+}
+.h2h-sum-lbl {
+  font-size: 9px; font-weight: 600;
+  color: var(--mg); text-transform: uppercase; letter-spacing: .5px;
+}
+.h2h-trend-row {
+  margin-top: 6px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--mg);
+}
+.h2h-trend-pill {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 800;
+  padding: 4px 10px; border-radius: 20px;
+}
+.h2h-game-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700;
+  color: var(--mg); text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 4px;
+}
+
+/* ══ v3.4 ══ */
+@keyframes spin { to { transform: rotate(360deg); } }
+.autofill-status { border-radius:8px;padding:9px 12px;font-size:12px;font-weight:500;line-height:1.5; }
+.autofill-status.show,.autofill-status.success,.autofill-status.partial,
+.autofill-status.failed,.autofill-status.loading { display:block; }
+.autofill-status.success { background:rgba(16,185,129,.1);color:#6EE7B7;border:1px solid rgba(16,185,129,.3); }
+.autofill-status.partial { background:rgba(245,158,11,.1);color:#FCD34D;border:1px solid rgba(245,158,11,.3); }
+.autofill-status.failed  { background:rgba(239,68,68,.1);color:#FCA5A5;border:1px solid rgba(239,68,68,.3); }
+.autofill-status.loading { background:rgba(6,182,212,.06);color:#A5F3FC;border:1px solid rgba(6,182,212,.2); }
+.autofill-status { display:none; }
+.input-field.autofilled { border-color:rgba(6,182,212,.6)!important;background:rgba(6,182,212,.07)!important; }
+/* settings status handled by JS class */
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">🏀 BMA v3</div>
+    <div class="topbar-sub">Basketball Matchup Analyzer</div>
+  </div>
+  <div class="topbar-badge">v3.4r</div>
+</div>
+
+<!-- PAGES -->
+
+
+<!-- ══════ v3.1: FIXTURE DETAIL MODAL ══════ -->
+<div class="modal-overlay" id="fxDetailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-header-title" id="fxModalTitle">Fixture Analysis</span>
+      <button class="modal-close" onclick="closeFxModal()">✕</button>
+    </div>
+    <div class="modal-body" id="fxModalBody"></div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: INPUT ══════════ -->
+<div class="page active" id="page-input">
+
+  <!-- ══ CLAUDE AI AUTOFILL CARD ══ -->
+  <div class="card" id="fixturesFetchCard">
+    <div class="card-header" style="background:linear-gradient(135deg,#1A73E8,#0D47A1)">
+      <span>🤖</span>
+      <span class="card-header-title" style="color:#BFDBFE">Gemini AI Autofill</span>
+      <span style="margin-left:auto;font-size:10px;font-weight:700;color:#93C5FD;padding:3px 7px;border-radius:5px;background:rgba(26,115,232,.2)">Gemini+Search</span>
+    </div>
+    <div class="card-body">
+      <div class="input-group" style="margin-bottom:8px">
+        <span class="input-label">Team A Name</span>
+        <input type="text" class="input-field" id="claudeTeamA"
+          placeholder="e.g. Boston Celtics, Real Madrid…"
+          style="font-size:14px">
+      </div>
+      <div class="input-group" style="margin-bottom:8px">
+        <span class="input-label">Team B Name</span>
+        <input type="text" class="input-field" id="claudeTeamB"
+          placeholder="e.g. Golden State Warriors, Fenerbahçe…"
+          style="font-size:14px">
+      </div>
+      <button class="btn" id="geminiAutofillBtn" onclick="geminiAutofill()"
+        style="width:100%;background:linear-gradient(135deg,#1A73E8,#0D47A1);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;letter-spacing:1px;padding:13px;margin-bottom:8px">
+        <span id="geminiSpinner" style="display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:middle"></span>
+        🤖 AUTOFILL WITH GEMINI AI
+      </button>
+      <div id="fetchStatus" class="autofill-status" style="display:none"></div>
+      <div id="claudeApiNotice" style="font-size:11px;color:var(--mg);line-height:1.7;margin-top:6px">
+        📌 Claude searches SofaScore, ESPN &amp; basketball-reference for real stats → fills last 3 games, FGA, 3PA, Defensive FG%, Assists Allowed &amp; H2H results.<br>
+        After filling, choose the correct <b style="color:var(--wh)">League Preset</b> below.<br>
+        <span id="claudeEnvNotice" style="display:none;color:#FCD34D">⚠️ <b>AI autofill requires this app to run inside Claude.ai.</b> Open it as a Claude artifact or ask Claude to embed it — local file mode has no API access.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- League + Controls -->
+  <div class="card">
+    <div class="card-header amber">
+      <span>⚙️</span>
+      <span class="card-header-title">Match Setup</span>
+    </div>
+    <div class="card-body">
+      <div class="input-group" style="margin-bottom:10px">
+        <span class="input-label">League Preset</span>
+        <div class="league-select-wrap">
+          <select class="league-select" id="leagueSelect" onchange="onLeagueChange()">
+          </select>
+          <span class="select-arrow">▼</span>
+        </div>
+        <div id="leagueRangeChip" class="league-range-chip">— pts</div>
+      </div>
+      <!-- v3.2: H2H SCOREBOARD -->
+      <div class="input-group">
+        <span class="input-label" style="display:flex;justify-content:space-between;align-items:center">
+          Last 3 H2H Results (optional)
+          <span id="h2hBonus" style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:var(--or);background:var(--ob);padding:3px 8px;border-radius:6px;border:1px solid var(--or)">H2H Bonus: +0</span>
+        </span>
+        <div class="h2h-section" id="h2hSection"></div>
+        <div class="h2h-summary-box" id="h2hSummaryBox" style="display:none">
+          <div>
+            <div class="h2h-sum-val" id="h2hRecord" style="color:var(--ac)">—</div>
+            <div class="h2h-sum-lbl">Win Record (A-B)</div>
+          </div>
+          <div>
+            <div class="h2h-sum-val" id="h2hAvgTotal" style="color:var(--lb)">—</div>
+            <div class="h2h-sum-lbl">Avg H2H Total</div>
+          </div>
+          <div>
+            <div class="h2h-sum-val" id="h2hAvgMargin" style="color:var(--gf)">—</div>
+            <div class="h2h-sum-lbl">Avg Margin</div>
+          </div>
+        </div>
+        <div class="h2h-trend-row" id="h2hTrendRow" style="display:none">
+          <span>Scoring trend:</span>
+          <span class="h2h-trend-pill" id="h2hTrendPill">—</span>
+          <span id="h2hDominance" style="font-size:11px;color:var(--wh)"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team A -->
+  <div class="card">
+    <div class="card-header">
+      <span>🏀</span>
+      <span class="card-header-title" style="color:var(--ac)">Team A — Last 3 Games</span>
+    </div>
+    <div class="card-body">
+      <input type="text" class="team-name-input" id="teamAName" placeholder="Team A Name" value="TEAM A" oninput="onInputChange()">
+      <div id="teamADataCheck" class="data-check ok">✅ Fill all 3 games</div>
+
+      <!-- Games A -->
+      <div id="teamAGames"></div>
+
+      <!-- Defensive stats A -->
+      <div class="divider"></div>
+      <div class="section-title">Defensive Stats (All 3 Games)</div>
+      <div id="teamADefGrid"></div>
+    </div>
+  </div>
+
+  <!-- Team B -->
+  <div class="card">
+    <div class="card-header" style="background:linear-gradient(135deg,var(--mb),#3B72C4)">
+      <span>🏀</span>
+      <span class="card-header-title" style="color:#DBEAFE">Team B — Last 3 Games</span>
+    </div>
+    <div class="card-body">
+      <input type="text" class="team-name-input" id="teamBName" placeholder="Team B Name" value="TEAM B" oninput="onInputChange()">
+      <div id="teamBDataCheck" class="data-check ok">✅ Fill all 3 games</div>
+
+      <div id="teamBGames"></div>
+
+      <div class="divider"></div>
+      <div class="section-title">Defensive Stats (All 3 Games)</div>
+      <div id="teamBDefGrid"></div>
+    </div>
+  </div>
+
+  <div class="btn-row-split">
+    <button class="btn btn-accent" onclick="navigateTo('analysis')">⚡ ANALYZE MATCHUP →</button>
+    <button class="btn btn-reset" onclick="confirmReset()">🔄 RESET</button>
+  </div>
+  <div class="small-note">RESET clears all inputs · Saved log is unaffected · Data auto-saves</div>
+</div>
+
+<!-- ══════════ PAGE: ANALYSIS ══════════ -->
+<div class="page" id="page-analysis">
+
+  <!-- Scores -->
+  <div id="dataLockout" style="display:none" class="data-check bad" style="margin-bottom:12px">
+    ⛔ INCOMPLETE DATA — Return to Input and fill all 3 games for both teams
+  </div>
+
+  <div class="score-display" id="scoreDisplay"></div>
+  <div class="classification invalid" id="classificationBadge">— Enter data —</div>
+
+  <!-- Rating breakdown -->
+  <div class="card">
+    <div class="card-header green">
+      <span>📊</span>
+      <span class="card-header-title">Rating Breakdown</span>
+    </div>
+    <div class="card-body">
+      <div class="tab-row">
+        <button class="tab-btn active" id="ratingTabA" onclick="showRatingTab('a')">Team A</button>
+        <button class="tab-btn" id="ratingTabB" onclick="showRatingTab('b')">Team B</button>
+      </div>
+      <div id="ratingGridA" class="rating-grid"></div>
+      <div id="ratingGridB" class="rating-grid" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Tempo + Meters -->
+  <div class="card">
+    <div class="card-header amber">
+      <span>⚡</span>
+      <span class="card-header-title">Tempo Control</span>
+    </div>
+    <div class="card-body">
+      <div id="tempoControl" class="suggestion-secondary" style="text-align:center;font-weight:700;font-size:15px"></div>
+      <div class="meter-row">
+        <div class="meter-box">
+          <div class="meter-label">Trap Risk</div>
+          <div class="meter-value trap" id="trapPct">—</div>
+        </div>
+        <div class="meter-box">
+          <div class="meter-label">Confidence</div>
+          <div class="meter-value conf" id="confPct">—</div>
+        </div>
+        <div class="meter-box">
+          <div class="meter-label">OT Risk</div>
+          <div class="meter-value" id="otRisk" style="color:var(--mg)">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trap Alerts -->
+  <div class="card">
+    <div class="card-header red">
+      <span>🚨</span>
+      <span class="card-header-title">Alert System (9 Checks)</span>
+    </div>
+    <div class="card-body" id="alertsContainer"></div>
+  </div>
+
+  <!-- Suggestion -->
+  <div class="card">
+    <div class="card-header" style="background:linear-gradient(135deg,#78350F,#B45309)">
+      <span>🎯</span>
+      <span class="card-header-title">Auto Suggestion</span>
+    </div>
+    <div class="card-body">
+      <div class="suggestion-main" id="mainSuggestion">—</div>
+      <div class="suggestion-secondary" id="secondarySuggestion">—</div>
+      <div id="mixedGuide" style="display:none" class="alert-item warn">
+        <div>
+          <span class="alert-label">Mixed Zone 5–7 Guide</span>
+          📌 (1) Check if both teams same style (2) Q1 combined ≥ league Q1 fast threshold? (3) Line moving up? (4) OT risk flagged? If Q1 is slow → lean under regardless of pre-game score.
+        </div>
+      </div>
+      <div id="trapCaveat" style="display:none" class="alert-item info">
+        <div>
+          <span class="alert-label">0% Trap Caveat</span>
+          ⚠️ 0% trap risk does NOT guarantee safety. Verify volume data is complete. Check for OT risk and single-game shooting outliers.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save to Log -->
+  <button class="btn btn-accent" id="saveToLogBtn" onclick="saveToLog()">
+    💾 SAVE TO FIXTURE LOG
+  </button>
+</div>
+
+<!-- ══════════ PAGE: Q1 TRACKER ══════════ -->
+<div class="page" id="page-q1">
+
+  <div class="card">
+    <div class="card-header red">
+      <span>🔴</span>
+      <span class="card-header-title">Live Q1 Tracker</span>
+    </div>
+    <div class="card-body">
+      <div class="small-note" style="margin-bottom:12px;text-align:left;color:var(--lg)">
+        Enter Q1 data as the game happens. Thresholds auto-adjust to your selected league.
+      </div>
+
+      <div class="input-grid" style="margin-bottom:10px">
+        <div class="input-group">
+          <span class="input-label">Team A Q1 Pts</span>
+          <input type="number" class="input-field" id="q1A" placeholder="e.g. 28" oninput="calcQ1()">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Team B Q1 Pts</span>
+          <input type="number" class="input-field" id="q1B" placeholder="e.g. 24" oninput="calcQ1()">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Team A Q1 FGA</span>
+          <input type="number" class="input-field" id="q1AFGA" placeholder="e.g. 22" oninput="calcQ1()">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Team B Q1 FGA</span>
+          <input type="number" class="input-field" id="q1BFGA" placeholder="e.g. 20" oninput="calcQ1()">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Team A Q1 3PA</span>
+          <input type="number" class="input-field" id="q1A3PA" placeholder="e.g. 8" oninput="calcQ1()">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Team B Q1 3PA</span>
+          <input type="number" class="input-field" id="q1B3PA" placeholder="e.g. 7" oninput="calcQ1()">
+        </div>
+      </div>
+
+      <div class="q1-grid">
+        <div class="q1-result">
+          <div class="q1-result-label">Combined Q1</div>
+          <div class="q1-result-val" id="q1Combined">—</div>
+        </div>
+        <div class="q1-result">
+          <div class="q1-result-label">Projected Total</div>
+          <div class="q1-result-val" id="q1Projected">—</div>
+        </div>
+        <div class="q1-result">
+          <div class="q1-result-label">Combined FGA</div>
+          <div class="q1-result-val" id="q1FGACombined">—</div>
+        </div>
+        <div class="q1-result">
+          <div class="q1-result-label">Combined 3PA</div>
+          <div class="q1-result-val" id="q1TPACombined">—</div>
+        </div>
+      </div>
+
+      <div id="q1Assessment" class="classification invalid" style="margin-top:10px;font-size:16px">
+        Enter Q1 data above
+      </div>
+      <div id="q1LiveCall" class="suggestion-main" style="margin-top:10px;font-size:16px">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span>📋</span>
+      <span class="card-header-title">Q1 Benchmarks by League</span>
+    </div>
+    <div class="card-body" id="q1Benchmarks"></div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: FIXTURE LOG ══════════ -->
+<div class="page" id="page-log">
+
+  <div class="log-top-row">
+    <div class="section-title">Saved Fixtures</div>
+    <div class="log-btn-group no-print">
+      <button class="btn btn-print" onclick="printFixtures()">🖨️ PDF</button>
+      <button class="btn btn-ghost" onclick="clearAllFixtures()">🗑 Clear</button>
+    </div>
+  </div>
+
+  <div id="fixtureList"></div>
+
+  <div id="fixtureEmpty" class="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-text">No fixtures saved yet.<br>Analyze a matchup and tap<br>"Save to Fixture Log".</div>
+  </div>
+
+  <div id="fixtureStats" style="display:none" class="card" >
+    <div class="card-header green">
+      <span>📈</span>
+      <span class="card-header-title">Log Statistics</span>
+    </div>
+    <div class="card-body" id="fixtureStatsBody"></div>
+  </div>
+</div>
+
+
+<!-- ══════════ PAGE: PREDICTIONS (v3.1 NEW) ══════════ -->
+<div class="page" id="page-preds">
+
+  <div class="pred-date-banner">
+    <div class="pred-date-title" id="predDateTitle">TODAY'S PICKS</div>
+    <div class="pred-date-sub" id="predDateSub">Loading...</div>
+  </div>
+
+  <!-- Filter controls -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-header" style="background:linear-gradient(135deg,#0C4A6E,#0369A1)">
+      <span>🔮</span>
+      <span class="card-header-title">Prediction Engine</span>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div class="input-group">
+          <span class="input-label">League Filter</span>
+          <div class="league-select-wrap">
+            <select class="league-select" id="predLeagueFilter" onchange="renderPredictions()" style="font-size:13px">
+              <option value="ALL">All Leagues</option>
+            </select>
+            <span class="select-arrow">▼</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-label">Min Confidence</span>
+          <div class="league-select-wrap">
+            <select class="league-select" id="predConfMin" onchange="renderPredictions()" style="font-size:13px">
+              <option value="0">All</option>
+              <option value="50">≥ 50%</option>
+              <option value="60">≥ 60%</option>
+              <option value="70">≥ 70%</option>
+            </select>
+            <span class="select-arrow">▼</span>
+          </div>
+        </div>
+      </div>
+      <div class="small-note" style="text-align:left;color:var(--mg)">
+        📌 Predictions auto-generate from today's saved fixtures. Save a fixture → it appears here with full betting analysis.
+      </div>
+    </div>
+  </div>
+
+  <div id="predsList"></div>
+  <div id="predsEmpty" class="pred-empty-state">
+    <div class="pred-empty-icon">🔮</div>
+    <div class="pred-empty-text">
+      No fixtures saved today yet.<br><br>
+      Go to Input → Enter fixture → Analyze → Save to Log.<br>
+      Your prediction appears here automatically.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════ PAGE: SETTINGS (v3.4) ══════════ -->
+<div class="page" id="page-settings">
+
+  <div class="card">
+    <div class="card-header" style="background:linear-gradient(135deg,#1A73E8,#0D47A1)">
+      <span>🤖</span><span class="card-header-title">Gemini AI Autofill</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--mg);margin-bottom:10px;line-height:1.7">
+        Uses <b style="color:var(--wh)">Gemini 2.0 Flash</b> with Google Search grounding to pull real basketball stats from SofaScore, ESPN &amp; basketball-reference. Works on GitHub Pages. Free tier: 1,500 req/day.
+      </div>
+      <div class="input-group" style="margin-bottom:8px">
+        <span class="input-label">Gemini API Key</span>
+        <div style="display:flex;gap:8px">
+          <input type="password" class="input-field" id="geminiKeyInput"
+            placeholder="Paste your Gemini API key…"
+            style="flex:1;font-family:monospace;font-size:12px;letter-spacing:1px">
+          <button onclick="toggleGeminiVis()"
+            style="width:40px;padding:8px;background:rgba(255,255,255,.08);border:1px solid #253A55;border-radius:8px;font-size:15px;cursor:pointer;flex-shrink:0">👁</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button onclick="saveGeminiKey()"
+          style="flex:1;padding:12px;border:none;border-radius:10px;cursor:pointer;
+                 background:linear-gradient(135deg,#F59E0B,#FBBF24);color:#0D1B2A;
+                 font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px">
+          💾 SAVE KEY
+        </button>
+        <button onclick="testGeminiKey()"
+          style="flex:1;padding:12px;border:none;border-radius:10px;cursor:pointer;
+                 background:linear-gradient(135deg,#1A73E8,#0D47A1);color:#fff;
+                 font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px">
+          🧪 TEST
+        </button>
+      </div>
+      <div id="geminiKeyStatus" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
+      <div style="padding:10px;background:rgba(26,115,232,.1);border-radius:8px;border:1px solid rgba(26,115,232,.25)">
+        <div style="font-size:10px;font-weight:700;color:#93C5FD;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">How to get free key (1,500 req/day)</div>
+        <div style="font-size:11px;color:var(--mg);line-height:2">
+          1. Go to <b style="color:var(--wh)">aistudio.google.com</b><br>
+          2. Sign in → click <b style="color:var(--wh)">Get API key</b><br>
+          3. Create API key in new project<br>
+          4. Copy &amp; paste above → Save Key → Test
+        </div>
+      </div>
+      <div style="padding:10px;background:rgba(16,185,129,.07);border-radius:8px;border:1px solid rgba(16,185,129,.2);margin-top:8px">
+        <div style="font-size:10px;font-weight:700;color:#6EE7B7;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">What gets filled</div>
+        <div style="font-size:11px;color:var(--mg);line-height:1.9">
+          ✅ Last 3 games: Team Score &amp; Opp Score (newest → oldest)<br>
+          ✅ FGA &amp; 3PA per game<br>
+          ✅ Defensive FG% Allowed (opponent FG% against this team)<br>
+          ✅ Assists Allowed (opponent assists vs this team)<br>
+          ✅ Last 3 H2H Results
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header green"><span>🌍</span><span class="card-header-title">Leagues with Full Data</span></div>
+    <div class="card-body">
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">NBA</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">EuroLeague</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Turkish BSL</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Spanish ACB</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Italian Lega Basket</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">French Pro A</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Greek ESAKE</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Israeli BSL</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Adriatic (ABA)</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">Lithuanian LKL</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">BBL (German)</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">VTB United League</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">NCAA</span>
+        <span style="background:rgba(16,185,129,.1);color:var(--gf);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600">FIBA Champions League</span>
+        </div>
+      <div style="font-size:11px;color:var(--mg)">Other leagues: scores available. Box stats may need manual entry.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" style="background:linear-gradient(135deg,#374151,#4B5568)">
+      <span>📵</span><span class="card-header-title">Offline Mode</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--mg);line-height:2">
+        <span style="color:var(--gf);font-weight:700">✅ 100% offline:</span><br>
+        Manual entry · Analysis · Fixture log · Q1 tracker · Predictions · Print/PDF<br><br>
+        <span style="color:var(--yf);font-weight:700">⚠️ Needs internet:</span><br>
+        Get Fixtures / API auto-fill only
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ PAGE: GUIDE ══════════ -->
+<div class="page" id="page-guide">
+  <div class="card">
+    <div class="card-header amber">
+      <span>📖</span>
+      <span class="card-header-title">How to Use v3.2</span>
+    </div>
+    <div class="card-body">
+      <div id="guideContent"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header purple">
+      <span>🌍</span>
+      <span class="card-header-title">League Reference</span>
+    </div>
+    <div class="card-body" id="leagueRefContent"></div>
+  </div>
+  <div class="card">
+    <div class="card-header" style="background:linear-gradient(135deg,var(--or),#C2410C)">
+      <span>📝</span>
+      <span class="card-header-title">v3.2 Upgrade Log</span>
+    </div>
+    <div class="card-body" id="upgradeLogContent"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-input" onclick="navigateTo('input')">
+    <span class="nav-icon">✏️</span>
+    <span class="nav-label">Input</span>
+  </button>
+  <button class="nav-btn" id="nav-analysis" onclick="navigateTo('analysis')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Analysis</span>
+  </button>
+  <button class="nav-btn" id="nav-q1" onclick="navigateTo('q1')">
+    <span class="nav-icon">🔴</span>
+    <span class="nav-label">Q1</span>
+  </button>
+  <button class="nav-btn" id="nav-log" onclick="navigateTo('log')">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">Log</span>
+  </button>
+  <button class="nav-btn" id="nav-preds" onclick="navigateTo('preds')">
+    <span class="nav-icon">🔮</span>
+    <span class="nav-label">Picks</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="navigateTo('settings')">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">Settings</span>
+  </button>
+  <button class="nav-btn" id="nav-guide" onclick="navigateTo('guide')">
+    <span class="nav-icon">📖</span>
+    <span class="nav-label">Guide</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// LEAGUE DATA
+// ═══════════════════════════════════════════════════════════════════════
+const LEAGUES = {
+  "NBA":                     {pHi:215,pMid:200,pLo:185,fHi:88,fMid:82,fLo:75,tHi:33,tLo:27,q1F:28,q1S:22,range:"215–230"},
+  "EuroLeague":              {pHi:175,pMid:165,pLo:155,fHi:77,fMid:72,fLo:67,tHi:27,tLo:22,q1F:25,q1S:20,range:"155–175"},
+  "FIBA Champions League":   {pHi:170,pMid:160,pLo:150,fHi:75,fMid:70,fLo:65,tHi:26,tLo:21,q1F:24,q1S:19,range:"150–170"},
+  "BBL (German)":            {pHi:175,pMid:165,pLo:155,fHi:76,fMid:71,fLo:66,tHi:27,tLo:22,q1F:25,q1S:20,range:"160–175"},
+  "Lithuanian LKL":          {pHi:165,pMid:155,pLo:145,fHi:72,fMid:67,fLo:62,tHi:25,tLo:20,q1F:23,q1S:18,range:"155–170"},
+  "Georgian League":         {pHi:160,pMid:150,pLo:140,fHi:70,fMid:65,fLo:60,tHi:24,tLo:19,q1F:22,q1S:17,range:"145–165"},
+  "Turkish BSL":             {pHi:175,pMid:165,pLo:155,fHi:77,fMid:72,fLo:67,tHi:28,tLo:23,q1F:25,q1S:20,range:"165–180"},
+  "Spanish ACB":             {pHi:170,pMid:160,pLo:150,fHi:76,fMid:71,fLo:66,tHi:27,tLo:22,q1F:24,q1S:19,range:"160–175"},
+  "Adriatic (ABA)":          {pHi:165,pMid:155,pLo:145,fHi:73,fMid:68,fLo:63,tHi:26,tLo:21,q1F:23,q1S:18,range:"155–170"},
+  "NCAA":                    {pHi:160,pMid:150,pLo:140,fHi:66,fMid:61,fLo:56,tHi:22,tLo:17,q1F:23,q1S:18,range:"145–165"},
+  "Israeli BSL":             {pHi:170,pMid:160,pLo:150,fHi:75,fMid:70,fLo:65,tHi:27,tLo:22,q1F:24,q1S:19,range:"160–175"},
+  "Greek ESAKE":             {pHi:165,pMid:155,pLo:145,fHi:74,fMid:69,fLo:64,tHi:26,tLo:21,q1F:23,q1S:18,range:"155–170"},
+  "French Pro A":            {pHi:168,pMid:158,pLo:148,fHi:75,fMid:70,fLo:65,tHi:27,tLo:22,q1F:24,q1S:19,range:"158–172"},
+  "Italian Lega Basket":     {pHi:170,pMid:160,pLo:150,fHi:76,fMid:71,fLo:66,tHi:27,tLo:22,q1F:24,q1S:19,range:"160–175"},
+  "Czech NBL":               {pHi:158,pMid:148,pLo:138,fHi:70,fMid:65,fLo:60,tHi:24,tLo:19,q1F:22,q1S:17,range:"140–160"},
+  "Swiss NLA":               {pHi:155,pMid:145,pLo:135,fHi:68,fMid:63,fLo:58,tHi:23,tLo:18,q1F:21,q1S:16,range:"135–155"},
+  "Belgian EuroMillions":    {pHi:160,pMid:150,pLo:140,fHi:70,fMid:65,fLo:60,tHi:24,tLo:19,q1F:22,q1S:17,range:"140–160"},
+  "Dutch DBL":               {pHi:162,pMid:152,pLo:142,fHi:71,fMid:66,fLo:61,tHi:24,tLo:19,q1F:22,q1S:17,range:"142–162"},
+  "Polish PLK":              {pHi:163,pMid:153,pLo:143,fHi:72,fMid:67,fLo:62,tHi:25,tLo:20,q1F:23,q1S:18,range:"145–163"},
+  "Hungarian NB I/A":        {pHi:155,pMid:145,pLo:135,fHi:68,fMid:63,fLo:58,tHi:23,tLo:18,q1F:21,q1S:16,range:"135–155"},
+  "Romanian LNBM":           {pHi:153,pMid:143,pLo:133,fHi:67,fMid:62,fLo:57,tHi:22,tLo:17,q1F:20,q1S:16,range:"133–153"},
+  "Portuguese LPB":          {pHi:155,pMid:145,pLo:135,fHi:68,fMid:63,fLo:58,tHi:22,tLo:17,q1F:21,q1S:16,range:"135–155"},
+  "Austrian ABL":            {pHi:157,pMid:147,pLo:137,fHi:69,fMid:64,fLo:59,tHi:23,tLo:18,q1F:21,q1S:16,range:"137–157"},
+  "Slovenian Liga Nova KBM": {pHi:160,pMid:150,pLo:140,fHi:70,fMid:65,fLo:60,tHi:24,tLo:19,q1F:22,q1S:17,range:"140–160"},
+  "Bosnian Premier League":  {pHi:153,pMid:143,pLo:133,fHi:67,fMid:62,fLo:57,tHi:22,tLo:17,q1F:20,q1S:15,range:"133–153"},
+  "Serbian KLS":             {pHi:160,pMid:150,pLo:140,fHi:71,fMid:66,fLo:61,tHi:24,tLo:19,q1F:22,q1S:17,range:"142–162"},
+  "Macedonian NLB":          {pHi:152,pMid:142,pLo:132,fHi:66,fMid:61,fLo:56,tHi:21,tLo:16,q1F:20,q1S:15,range:"130–152"},
+  "Ukrainian SUPERLEAGUE":   {pHi:158,pMid:148,pLo:138,fHi:70,fMid:65,fLo:60,tHi:24,tLo:19,q1F:22,q1S:17,range:"138–158"},
+  "VTB United League":       {pHi:168,pMid:158,pLo:148,fHi:75,fMid:70,fLo:65,tHi:27,tLo:22,q1F:24,q1S:19,range:"155–170"},
+  "Low-Tier / Unknown":      {pHi:150,pMid:140,pLo:130,fHi:65,fMid:60,fLo:55,tHi:21,tLo:16,q1F:20,q1S:15,range:"130–150"},
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════
+let state = {
+  league: "EuroLeague",
+  teamAName: "TEAM A",
+  teamBName: "TEAM B",
+  gamesA: [{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0}],
+  gamesB: [{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0}],
+  defA: [{fgPct:0,ast:0},{fgPct:0,ast:0},{fgPct:0,ast:0}],
+  defB: [{fgPct:0,ast:0},{fgPct:0,ast:0},{fgPct:0,ast:0}],
+  h2hGames: [{a:null,b:null},{a:null,b:null},{a:null,b:null}],
+  analysis: null,
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// LOCALSTORAGE
+// ═══════════════════════════════════════════════════════════════════════
+function saveState() {
+  try { localStorage.setItem('bma_v3_state', JSON.stringify(state)); } catch(e){}
+}
+function loadState() {
+  try {
+    const s = localStorage.getItem('bma_v3_state');
+    if (s) { const p = JSON.parse(s); Object.assign(state, p); }
+  } catch(e){}
+}
+function getFixtures() {
+  try { return JSON.parse(localStorage.getItem('bma_v3_fixtures') || '[]'); } catch(e){ return []; }
+}
+function saveFixtures(arr) {
+  try { localStorage.setItem('bma_v3_fixtures', JSON.stringify(arr)); } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════
+function navigateTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page).classList.add('active');
+  if (page === 'analysis') runAnalysis();
+  if (page === 'log') renderFixtureLog();
+  if (page === 'guide') renderGuide();
+  if (page === 'preds') renderPredictions();
+  if (page === 'settings') onSettingsOpen();
+  window.scrollTo(0,0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUILD INPUT UI
+// ═══════════════════════════════════════════════════════════════════════
+function buildInputUI() {
+  // League select
+  const sel = document.getElementById('leagueSelect');
+  sel.innerHTML = Object.keys(LEAGUES).map(l =>
+    `<option value="${l}" ${l===state.league?'selected':''}>${l}</option>`
+  ).join('');
+
+  updateLeagueChip();
+  updateH2HBonus();
+
+  document.getElementById('teamAName').value = state.teamAName;
+  document.getElementById('teamBName').value = state.teamBName;
+
+  buildGameInputs('A');
+  buildGameInputs('B');
+  buildDefInputs('A');
+  buildDefInputs('B');
+}
+
+function buildGameInputs(team) {
+  const games = team === 'A' ? state.gamesA : state.gamesB;
+  const container = document.getElementById(`team${team}Games`);
+  container.innerHTML = '';
+
+  games.forEach((g, i) => {
+    const totalPts = (g.ts && g.os) ? g.ts + g.os : '—';
+    const div = document.createElement('div');
+    div.className = 'game-row';
+    div.innerHTML = `
+      <div class="game-label" style="display:flex;align-items:center;gap:8px">Game ${i+1}<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;background:${i===0?'rgba(16,185,129,.15)':i===2?'rgba(100,116,139,.12)'  :'rgba(43,127,255,.12)'};color:${i===0?'var(--gf)':i===2?'var(--mg)'  :'var(--lb)'}">${i===0?'MOST RECENT':i===1?'2ND RECENT':'OLDEST'}</span></div>
+      <div class="input-grid-3" style="margin-bottom:6px">
+        <div class="input-group">
+          <span class="input-label">Team Score</span>
+          <input type="number" class="input-field" id="g${team}${i}ts"
+            value="${g.ts||''}" placeholder="105"
+            oninput="updateGame('${team}',${i},'ts',this.value)">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Opp Score</span>
+          <input type="number" class="input-field" id="g${team}${i}os"
+            value="${g.os||''}" placeholder="98"
+            oninput="updateGame('${team}',${i},'os',this.value)">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Total Pts</span>
+          <div class="total-pts-display" id="tp${team}${i}">${totalPts}</div>
+        </div>
+      </div>
+      <div class="input-grid">
+        <div class="input-group">
+          <span class="input-label">FGA</span>
+          <input type="number" class="input-field" id="g${team}${i}fga"
+            value="${g.fga||''}" placeholder="88"
+            oninput="updateGame('${team}',${i},'fga',this.value)">
+        </div>
+        <div class="input-group">
+          <span class="input-label">3PA</span>
+          <input type="number" class="input-field" id="g${team}${i}tpa"
+            value="${g.tpa||''}" placeholder="32"
+            oninput="updateGame('${team}',${i},'tpa',this.value)">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function buildDefInputs(team) {
+  const defs = team === 'A' ? state.defA : state.defB;
+  const container = document.getElementById(`team${team}DefGrid`);
+  container.innerHTML = '';
+
+  defs.forEach((d, i) => {
+    const div = document.createElement('div');
+    div.className = 'game-row';
+    div.innerHTML = `
+      <div class="game-label" style="display:flex;align-items:center;gap:6px">Game ${i+1} Defense<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:10px;background:${i===0?'rgba(16,185,129,.15)':'rgba(100,116,139,.1)'};color:${i===0?'var(--gf)':'var(--mg)'}">${i===0?'MOST RECENT':i===2?'OLDEST':''}</span></div>
+      <div class="input-grid">
+        <div class="input-group">
+          <span class="input-label">FG% Allowed (e.g. 0.47)</span>
+          <input type="number" step="0.01" min="0" max="1" class="input-field pct"
+            id="d${team}${i}fg" value="${d.fgPct||''}" placeholder="0.47"
+            oninput="updateDef('${team}',${i},'fgPct',this.value)">
+        </div>
+        <div class="input-group">
+          <span class="input-label">Assists Allowed</span>
+          <input type="number" class="input-field" id="d${team}${i}ast"
+            value="${d.ast||''}" placeholder="22"
+            oninput="updateDef('${team}',${i},'ast',this.value)">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updateGame(team, idx, field, val) {
+  const arr = team === 'A' ? state.gamesA : state.gamesB;
+  arr[idx][field] = parseFloat(val) || 0;
+  // update total pts display
+  const g = arr[idx];
+  const tp = (g.ts && g.os) ? g.ts + g.os : '—';
+  const el = document.getElementById(`tp${team}${idx}`);
+  if (el) el.textContent = tp;
+  checkDataCompleteness(); buildH2HUI();
+  saveState();
+}
+
+function updateDef(team, idx, field, val) {
+  const arr = team === 'A' ? state.defA : state.defB;
+  arr[idx][field] = parseFloat(val) || 0;
+  saveState();
+}
+
+function onLeagueChange() {
+  state.league = document.getElementById('leagueSelect').value;
+  updateLeagueChip();
+  saveState();
+}
+
+function updateLeagueChip() {
+  const L = LEAGUES[state.league];
+  document.getElementById('leagueRangeChip').textContent = `Typical: ${L.range} pts`;
+}
+
+// ── v3.2: H2H SCOREBOARD LOGIC ──────────────────────────────────────────────
+function buildH2HUI() {
+  const section = document.getElementById('h2hSection');
+  section.innerHTML = '';
+  state.h2hGames.forEach((g, i) => {
+    const aVal = (g.a !== null && g.a !== undefined) ? g.a : '';
+    const bVal = (g.b !== null && g.b !== undefined) ? g.b : '';
+    const aClass = (g.a !== null && g.b !== null) ? (g.a > g.b ? 'winner' : g.a < g.b ? 'loser' : '') : '';
+    const bClass = (g.a !== null && g.b !== null) ? (g.b > g.a ? 'winner' : g.b < g.a ? 'loser' : '') : '';
+    const total = (g.a !== null && g.b !== null) ? g.a + g.b : '—';
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="h2h-game-label">H2H Game ${i+1}</div>
+      <div class="h2h-game-row">
+        <input type="number" class="h2h-score-input ${aClass}" id="h2h${i}a"
+          value="${aVal}" placeholder="A score"
+          oninput="onH2HScoreChange(${i},'a',this.value)">
+        <div class="h2h-vs-badge">VS</div>
+        <input type="number" class="h2h-score-input ${bClass}" id="h2h${i}b"
+          value="${bVal}" placeholder="B score"
+          oninput="onH2HScoreChange(${i},'b',this.value)">
+        <div class="h2h-total-badge" id="h2hTotal${i}">${total !== '—' ? total : '—'}</div>
+      </div>`;
+    section.appendChild(div);
+  });
+  updateH2HSummary();
+}
+
+function onH2HScoreChange(idx, team, val) {
+  const v = val === '' ? null : parseFloat(val);
+  state.h2hGames[idx][team] = (isNaN(v) || v === null) ? null : v;
+  // Update winner/loser styling
+  const g = state.h2hGames[idx];
+  const aEl = document.getElementById(`h2h${idx}a`);
+  const bEl = document.getElementById(`h2h${idx}b`);
+  const tEl = document.getElementById(`h2hTotal${idx}`);
+  if (aEl && bEl) {
+    aEl.className = 'h2h-score-input' + (g.a !== null && g.b !== null ? (g.a > g.b ? ' winner' : g.a < g.b ? ' loser' : '') : '');
+    bEl.className = 'h2h-score-input' + (g.a !== null && g.b !== null ? (g.b > g.a ? ' winner' : g.b < g.a ? ' loser' : '') : '');
+    if (tEl) tEl.textContent = (g.a !== null && g.b !== null) ? g.a + g.b : '—';
+  }
+  updateH2HSummary();
+  saveState();
+}
+
+function getH2HStats() {
+  const complete = state.h2hGames.filter(g => g.a !== null && g.b !== null);
+  if (!complete.length) return null;
+  const totals  = complete.map(g => g.a + g.b);
+  const margins = complete.map(g => Math.abs(g.a - g.b));
+  const aWins   = complete.filter(g => g.a > g.b).length;
+  const bWins   = complete.filter(g => g.b > g.a).length;
+  const avgTotal  = parseFloat((totals.reduce((s,v)=>s+v,0)/totals.length).toFixed(1));
+  const avgMargin = parseFloat((margins.reduce((s,v)=>s+v,0)/margins.length).toFixed(1));
+  // Trend: compare last vs first (if ≥2 games)
+  let trend = 'stable';
+  if (totals.length >= 2) {
+    const diff = totals[totals.length-1] - totals[0];
+    trend = diff >= 6 ? 'rising' : diff <= -6 ? 'falling' : 'stable';
+  }
+  const dominant = aWins > bWins ? 'A' : bWins > aWins ? 'B' : 'even';
+  return { complete, totals, margins, aWins, bWins, avgTotal, avgMargin, trend, dominant, count: complete.length };
+}
+
+function updateH2HSummary() {
+  const st = getH2HStats();
+  const summaryBox  = document.getElementById('h2hSummaryBox');
+  const trendRow    = document.getElementById('h2hTrendRow');
+  const bonusEl     = document.getElementById('h2hBonus');
+  if (!st) {
+    if (summaryBox) summaryBox.style.display = 'none';
+    if (trendRow)   trendRow.style.display   = 'none';
+    if (bonusEl)    bonusEl.textContent = 'H2H Bonus: +0';
+    return;
+  }
+  if (summaryBox) {
+    summaryBox.style.display = 'grid';
+    document.getElementById('h2hRecord').textContent    = `${st.aWins}–${st.bWins}`;
+    document.getElementById('h2hAvgTotal').textContent  = st.avgTotal;
+    document.getElementById('h2hAvgMargin').textContent = `±${st.avgMargin}`;
+  }
+  if (trendRow) {
+    trendRow.style.display = 'flex';
+    const pill = document.getElementById('h2hTrendPill');
+    const dom  = document.getElementById('h2hDominance');
+    if (pill) {
+      pill.textContent = st.trend === 'rising' ? '📈 Rising' : st.trend === 'falling' ? '📉 Falling' : '➡️ Stable';
+      pill.style.background = st.trend === 'rising' ? 'rgba(22,163,74,.15)' : st.trend === 'falling' ? 'rgba(220,38,38,.1)' : 'rgba(100,116,139,.12)';
+      pill.style.color = st.trend === 'rising' ? '#6EE7B7' : st.trend === 'falling' ? '#FCA5A5' : 'var(--mg)';
+    }
+    if (dom) {
+      const nameA = document.getElementById('teamAName').value || 'Team A';
+      const nameB = document.getElementById('teamBName').value || 'Team B';
+      dom.textContent = st.dominant === 'A' ? `${nameA} leads H2H` :
+                        st.dominant === 'B' ? `${nameB} leads H2H` : 'Head-to-head even';
+      dom.style.color = st.dominant !== 'even' ? 'var(--ac)' : 'var(--mg)';
+    }
+  }
+  // Bonus calculation
+  const L = LEAGUES[state.league] || LEAGUES['Low-Tier / Unknown'];
+  let bonus = 0;
+  if (st.avgTotal >= L.pHi)  bonus = 2;
+  else if (st.avgTotal >= L.pMid) bonus = 1;
+  // Trend bonus: rising trend adds +1 if not already at max
+  if (st.trend === 'rising' && bonus < 2) bonus = Math.min(2, bonus + 1);
+  if (bonusEl) bonusEl.textContent = `H2H Bonus: +${bonus}`;
+}
+
+function onH2HChange() { /* legacy stub — no-op in v3.2 */ }
+function updateH2HBonus() { updateH2HSummary(); }
+
+function onInputChange() {
+  state.teamAName = document.getElementById('teamAName').value || 'TEAM A';
+  state.teamBName = document.getElementById('teamBName').value || 'TEAM B';
+  saveState();
+}
+
+function checkDataCompleteness() {
+  const aComplete = state.gamesA.every(g => g.ts && g.os && g.fga);
+  const bComplete = state.gamesB.every(g => g.ts && g.os && g.fga);
+  const elA = document.getElementById('teamADataCheck');
+  const elB = document.getElementById('teamBDataCheck');
+  if (elA) {
+    elA.className = `data-check ${aComplete ? 'ok' : 'bad'}`;
+    elA.textContent = aComplete ? '✅ Team A data complete' : '⛔ Fill all 3 games (Score + FGA required)';
+  }
+  if (elB) {
+    elB.className = `data-check ${bComplete ? 'ok' : 'bad'}`;
+    elB.textContent = bComplete ? '✅ Team B data complete' : '⛔ Fill all 3 games (Score + FGA required)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CORE ANALYSIS ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+function avg(arr) { return arr.reduce((a,b)=>a+b,0)/arr.length; }
+
+function calcRatings() {
+  const L = LEAGUES[state.league];
+  const gA = state.gamesA, gB = state.gamesB;
+  const dA = state.defA, dB = state.defB;
+
+  const aComplete = gA.every(g => g.ts && g.os && g.fga);
+  const bComplete = gB.every(g => g.ts && g.os && g.fga);
+
+  if (!aComplete || !bComplete) return { invalid: true };
+
+  // Averages
+  const avgPtsA = avg(gA.map(g => g.ts + g.os));
+  const avgFGAA = avg(gA.map(g => g.fga));
+  const avgTPAA = avg(gA.map(g => g.tpa));
+  const avgFGPctA = avg(dA.map(d => d.fgPct));
+  const avgAstA = avg(dA.map(d => d.ast));
+
+  const avgPtsB = avg(gB.map(g => g.ts + g.os));
+  const avgFGAB = avg(gB.map(g => g.fga));
+  const avgTPAB = avg(gB.map(g => g.tpa));
+  const avgFGPctB = avg(dB.map(d => d.fgPct));
+  const avgAstB = avg(dB.map(d => d.ast));
+
+  // Ratings
+  function ptsScore(v) { return v >= L.pHi ? 3 : v >= L.pMid ? 2 : v >= L.pLo ? 1 : 0; }
+  function fgaScore(v) { return v >= L.fHi ? 3 : v >= L.fMid ? 2 : v >= L.fLo ? 1 : 0; }
+  function tpaScore(v) { return v >= L.tHi ? 2 : v >= L.tLo ? 1 : 0; }
+  function defScore(fgp, ast) {
+    if (fgp >= 0.52 || ast >= 25) return 2;
+    if (fgp >= 0.47 || ast >= 22) return 1;
+    return 0;
+  }
+  function h2hScore() {
+    const st = getH2HStats();
+    if (!st) return 0;
+    let bonus = 0;
+    if (st.avgTotal >= L.pHi) bonus = 2;
+    else if (st.avgTotal >= L.pMid) bonus = 1;
+    if (st.trend === 'rising' && bonus < 2) bonus = Math.min(2, bonus + 1);
+    return bonus;
+  }
+
+  const r1A = ptsScore(avgPtsA), r2A = fgaScore(avgFGAA), r3A = tpaScore(avgTPAA);
+  const r4A = defScore(avgFGPctA, avgAstA), r5A = h2hScore();
+  const rawA = r1A + r2A + r3A + r4A + r5A;
+  const scoreA = Math.min(10, rawA);
+
+  const r1B = ptsScore(avgPtsB), r2B = fgaScore(avgFGAB), r3B = tpaScore(avgTPAB);
+  const r4B = defScore(avgFGPctB, avgAstB), r5B = h2hScore();
+  const rawB = r1B + r2B + r3B + r4B + r5B;
+  const scoreB = Math.min(10, rawB);
+
+  const combined = parseFloat(((scoreA + scoreB) / 2).toFixed(1));
+
+  // Alerts
+  const alerts = [];
+
+  // 1. Fake Fast
+  if (combined >= 8 && (avgFGAA < 75 || avgTPAA < 27)) {
+    alerts.push({type:'warn',label:'Fake Fast',msg:'High score but low volume. Verify actual game pace!'});
+  } else { alerts.push({type:'ok',label:'Fake Fast',msg:'No fake fast signal'}); }
+
+  // 2. Pace Conflict
+  if (Math.abs(scoreA - scoreB) >= 3) {
+    alerts.push({type:'warn',label:'Pace Conflict',msg:`Teams have opposing styles (diff: ${Math.abs(scoreA-scoreB).toFixed(0)} pts). Combined score unreliable!`});
+  } else { alerts.push({type:'ok',label:'Pace Conflict',msg:'Pace appears consistent'}); }
+
+  // 3. Defense Collapse
+  if ((avgFGPctA >= 0.52 || avgFGPctB >= 0.52) && combined < 6) {
+    alerts.push({type:'warn',label:'Defense Collapse',msg:'Defensive weakness is an outlier. Not sustainable fast pace!'});
+  } else { alerts.push({type:'ok',label:'Defense Collapse',msg:'No defense collapse signal'}); }
+
+  // 4. Low Vol High Eff A
+  if (avgFGAA < 70 && avgFGPctA >= 0.50) {
+    alerts.push({type:'warn',label:'Low Vol High Eff (A)',msg:'Team A: slow pace but efficient. Risky over bet!'});
+  } else { alerts.push({type:'ok',label:'Low Vol High Eff (A)',msg:'Volume/efficiency balanced (Team A)'}); }
+
+  // 5. Low Vol High Eff B
+  if (avgFGAB < 70 && avgFGPctB >= 0.50) {
+    alerts.push({type:'warn',label:'Low Vol High Eff (B)',msg:'Team B: slow pace but efficient. Risky over bet!'});
+  } else { alerts.push({type:'ok',label:'Low Vol High Eff (B)',msg:'Volume/efficiency balanced (Team B)'}); }
+
+  // 6. Ultra Slow (NEW)
+  if (avgTPAA <= 12 || avgTPAB <= 12 || avgPtsA <= 130 || avgPtsB <= 130) {
+    alerts.push({type:'info',label:'⚡ Ultra-Slow [NEW]',msg:'Extremely low volume/total. Strong under. Verify league tier.'});
+  } else { alerts.push({type:'ok',label:'Ultra-Slow',msg:'No Ultra-Slow signal'}); }
+
+  // 7. Combined FGA (NEW)
+  const combFGA = avgFGAA + avgFGAB;
+  if (combFGA < 115) {
+    alerts.push({type:'warn',label:'⚡ Combined FGA [NEW]',msg:`Ultra low combined FGA: ${combFGA.toFixed(0)}. Both teams low volume. Very strong under signal.`});
+  } else { alerts.push({type:'ok',label:'Combined FGA',msg:`Combined FGA: ${combFGA.toFixed(0)} — acceptable`}); }
+
+  // 8. OT Risk (NEW)
+  const otRisk = Math.abs(scoreA - scoreB) <= 1 && combined >= 5;
+  if (otRisk) {
+    alerts.push({type:'warn',label:'⚡ OT Risk [NEW]',msg:'Teams closely matched. Under bets vulnerable to overtime!'});
+  } else { alerts.push({type:'ok',label:'OT Risk',msg:'Low OT risk'}); }
+
+  // 9. Blowout Pattern (NEW)
+  const allGames = [...gA, ...gB];
+  const hasBlowout = allGames.some(g => Math.abs(g.ts - g.os) >= 21);
+  if (hasBlowout) {
+    alerts.push({type:'warn',label:'⚡ Blowout Pattern [NEW]',msg:'Recent blowout detected (21+ pt margin). Potential collapse team. Under likely.'});
+  } else { alerts.push({type:'ok',label:'Blowout Pattern',msg:'No blowout pattern detected'}); }
+
+  // 10. H2H Consistency (v3.2 NEW)
+  const h2hSt = getH2HStats();
+  if (h2hSt && h2hSt.count >= 2) {
+    const maxT = Math.max(...h2hSt.totals);
+    const minT = Math.min(...h2hSt.totals);
+    if (maxT - minT >= 20) {
+      alerts.push({type:'warn', label:'⚡ H2H Inconsistent', msg:`H2H totals vary widely (${minT}–${maxT} pts). Unpredictable matchup — use H2H data with caution.`});
+    } else {
+      alerts.push({type:'ok', label:'H2H Consistency', msg:`H2H totals consistent (${minT}–${maxT} pts). Reliable pattern.`});
+    }
+  }
+
+  const warnCount = alerts.filter(a => a.type === 'warn').length;
+  const totalAlerts = alerts.length;
+  const trapPct = Math.round(warnCount / Math.max(totalAlerts, 9) * 100);
+  const conf = Math.max(5, Math.min(95,
+    combined >= 8 ? 75 + (combined - 8) * 5 :
+    combined >= 5 ? 45 + (combined - 5) * 10 :
+    20 + combined * 5
+  ) - warnCount * 7);
+
+  // Tempo
+  let tempo;
+  if (Math.abs(scoreA - scoreB) <= 1) tempo = '⚖️ Unstable — Pace Conflict';
+  else if (scoreA > scoreB) tempo = `${state.teamAName} controls pace`;
+  else tempo = `${state.teamBName} controls pace`;
+
+  return {
+    invalid: false,
+    scoreA, scoreB, combined,
+    rawA, rawB,
+    r1A,r2A,r3A,r4A,r5A,
+    r1B,r2B,r3B,r4B,r5B,
+    avgPtsA,avgFGAA,avgTPAA,avgFGPctA,avgAstA,
+    avgPtsB,avgFGAB,avgTPAB,avgFGPctB,avgAstB,
+    alerts, warnCount, trapPct, conf,
+    tempo, otRisk,
+    combFGA,
+  };
+}
+
+function getClassification(score) {
+  if (score >= 8) return {cls:'fast', text:'🟢 FAST — HIGH PACE'};
+  if (score >= 5) return {cls:'mixed', text:'🟡 MIXED / UNSTABLE'};
+  if (score >= 1) return {cls:'slow', text:'🔴 SLOW — LOW PACE'};
+  return {cls:'invalid', text:'⚪ NO DATA'};
+}
+
+function getSuggestion(r, combined) {
+  if (r.trapPct >= 60) return `🚨 HIGH TRAP RISK (${r.warnCount}/9 alerts) — AVOID or CONFIRM LIVE only`;
+  if (combined >= 8 && r.trapPct <= 20) return '🟢 HIGH CONFIDENCE OVER — Strong fast signal, low trap risk';
+  if (combined >= 8) return '🟡 LEAN FAST — Trap alerts active. Confirm with Q1 live data';
+  if (combined >= 7) return '🟡 LEAN FAST — Confirm in Live Q1 before committing';
+  if (combined >= 5) return '🟡 MIXED — CONFIRM LIVE. Do not bet pre-game';
+  if (combined >= 3) return '🔴 LEAN UNDER — Slow game likely';
+  return '🔴 HIGH CONFIDENCE UNDER — Strong slow signal';
+}
+
+function getSecondary(r) {
+  if (Math.abs(r.scoreA - r.scoreB) >= 3) return '⚡ PACE SPLIT — Consider 1st Half Over/Under separately';
+  if (r.avgFGPctA >= 0.50 && r.avgFGPctB >= 0.50) return '🔥 BOTH DEFENSES WEAK — Elevated scoring likely';
+  if (r.otRisk) return '⚠️ OT RISK ACTIVE — Under bets exposed. Line includes OT.';
+  if (r.alerts.find(a => a.label.includes('Blowout') && a.type === 'warn')) return '📉 BLOWOUT PATTERN — Potential collapse. Under favoured';
+  if (r.alerts.find(a => a.label.includes('Ultra') && a.type === 'info')) return '🔵 ULTRA-SLOW — Check league tier. Totals may be 130-155 range';
+  return '📊 Review all alerts before deciding';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER ANALYSIS
+// ═══════════════════════════════════════════════════════════════════════
+function runAnalysis() {
+  const r = calcRatings();
+  state.analysis = r;
+
+  const lockout = document.getElementById('dataLockout');
+  if (r.invalid) {
+    lockout.style.display = 'flex';
+    document.getElementById('scoreDisplay').innerHTML = '';
+    document.getElementById('classificationBadge').className = 'classification invalid';
+    document.getElementById('classificationBadge').textContent = '⛔ INCOMPLETE DATA — Fill all 3 games';
+    document.getElementById('alertsContainer').innerHTML = '';
+    document.getElementById('mainSuggestion').textContent = '⛔ Cannot analyze — missing game data';
+    document.getElementById('secondarySuggestion').textContent = '';
+    document.getElementById('tempoControl').textContent = '—';
+    document.getElementById('trapPct').textContent = '—';
+    document.getElementById('confPct').textContent = '—';
+    document.getElementById('otRisk').textContent = '—';
+    return;
+  }
+  lockout.style.display = 'none';
+
+  // Scores
+  const sd = document.getElementById('scoreDisplay');
+  sd.innerHTML = `
+    <div class="score-box team-a">
+      <div class="score-box-label">Team A</div>
+      <div class="score-box-name">${state.teamAName}</div>
+      <div class="score-box-number">${r.scoreA}<span class="score-box-denom">/10</span></div>
+    </div>
+    <div class="score-box team-b">
+      <div class="score-box-label">Team B</div>
+      <div class="score-box-name">${state.teamBName}</div>
+      <div class="score-box-number">${r.scoreB}<span class="score-box-denom">/10</span></div>
+    </div>
+    <div class="score-box combined">
+      <div class="score-box-label">Combined</div>
+      <div class="score-box-name">Score</div>
+      <div class="score-box-number">${r.combined}<span class="score-box-denom">/10</span></div>
+    </div>
+  `;
+
+  // Classification
+  const cls = getClassification(r.combined);
+  const badge = document.getElementById('classificationBadge');
+  badge.className = `classification ${cls.cls}`;
+  badge.textContent = cls.text;
+
+  // Ratings
+  const cats = [
+    {label:'Total Pts Trend',max:3},
+    {label:'Shot Volume (FGA)',max:3},
+    {label:'3-Point Volume',max:2},
+    {label:'Defense Weakness',max:2},
+    {label:'H2H Bonus',max:2},
+  ];
+  const scoresA = [r.r1A,r.r2A,r.r3A,r.r4A,r.r5A];
+  const scoresB = [r.r1B,r.r2B,r.r3B,r.r4B,r.r5B];
+
+  ['A','B'].forEach(team => {
+    const scores = team === 'A' ? scoresA : scoresB;
+    const el = document.getElementById(`ratingGrid${team}`);
+    el.innerHTML = cats.map((c,i) => `
+      <div class="rating-item">
+        <div class="rating-item-label">${c.label}</div>
+        <div class="rating-item-bar">
+          <div class="rating-bar-track">
+            <div class="rating-bar-fill" style="width:${scores[i]/c.max*100}%"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:3px">
+          <span class="rating-score">${scores[i]}</span>
+          <span class="rating-max">/ ${c.max}</span>
+        </div>
+      </div>
+    `).join('');
+  });
+
+  // Tempo
+  document.getElementById('tempoControl').textContent = r.tempo;
+  document.getElementById('trapPct').textContent = `${r.trapPct}%`;
+  document.getElementById('trapPct').className = `meter-value ${r.trapPct >= 60 ? 'danger' : r.trapPct >= 30 ? 'trap' : 'conf'}`;
+  document.getElementById('confPct').textContent = `${r.conf}%`;
+  document.getElementById('otRisk').textContent = r.otRisk ? '⚠️ YES' : '✅ Low';
+  document.getElementById('otRisk').style.color = r.otRisk ? 'var(--yf)' : 'var(--gf)';
+
+  // Alerts
+  const ac = document.getElementById('alertsContainer');
+  ac.innerHTML = r.alerts.map(a => `
+    <div class="alert-item ${a.type}">
+      <div>
+        <span class="alert-label">${a.label}</span>
+        ${a.msg}
+      </div>
+    </div>
+  `).join('');
+
+  // Suggestions
+  const sugg = getSuggestion(r, r.combined);
+  document.getElementById('mainSuggestion').textContent = sugg;
+  document.getElementById('secondarySuggestion').textContent = getSecondary(r);
+
+  const mixedGuide = document.getElementById('mixedGuide');
+  const trapCaveat = document.getElementById('trapCaveat');
+  mixedGuide.style.display = (r.combined >= 5 && r.combined < 8) ? 'flex' : 'none';
+  trapCaveat.style.display = (r.trapPct === 0) ? 'flex' : 'none';
+}
+
+function showRatingTab(team) {
+  document.getElementById('ratingGridA').style.display = team === 'a' ? 'grid' : 'none';
+  document.getElementById('ratingGridB').style.display = team === 'b' ? 'grid' : 'none';
+  document.getElementById('ratingTabA').className = `tab-btn ${team==='a'?'active':''}`;
+  document.getElementById('ratingTabB').className = `tab-btn ${team==='b'?'active':''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Q1 TRACKER
+// ═══════════════════════════════════════════════════════════════════════
+function calcQ1() {
+  const L = LEAGUES[state.league];
+  const a = parseFloat(document.getElementById('q1A').value)||0;
+  const b = parseFloat(document.getElementById('q1B').value)||0;
+  const afga = parseFloat(document.getElementById('q1AFGA').value)||0;
+  const bfga = parseFloat(document.getElementById('q1BFGA').value)||0;
+  const a3pa = parseFloat(document.getElementById('q1A3PA').value)||0;
+  const b3pa = parseFloat(document.getElementById('q1B3PA').value)||0;
+
+  if (!a && !b) {
+    document.getElementById('q1Combined').textContent = '—';
+    document.getElementById('q1Projected').textContent = '—';
+    document.getElementById('q1FGACombined').textContent = '—';
+    document.getElementById('q1TPACombined').textContent = '—';
+    document.getElementById('q1Assessment').className = 'classification invalid';
+    document.getElementById('q1Assessment').textContent = 'Enter Q1 data above';
+    document.getElementById('q1LiveCall').textContent = '—';
+    return;
+  }
+
+  const comb = a + b;
+  const proj = comb * 4;
+  const combFGA = afga + bfga;
+  const combTPA = a3pa + b3pa;
+
+  document.getElementById('q1Combined').textContent = comb;
+  document.getElementById('q1Projected').textContent = proj;
+  document.getElementById('q1FGACombined').textContent = combFGA || '—';
+  document.getElementById('q1TPACombined').textContent = combTPA || '—';
+
+  const assess = document.getElementById('q1Assessment');
+  const liveCall = document.getElementById('q1LiveCall');
+
+  if (comb >= L.q1F) {
+    assess.className = 'classification fast';
+    assess.textContent = `🟢 ON PACE — Fast (≥${L.q1F} threshold)`;
+    liveCall.textContent = '🟢 CONFIRM FAST — Over lean strengthened';
+  } else if (comb < L.q1S) {
+    assess.className = 'classification slow';
+    assess.textContent = `🔴 SLOW PACE — Below ${L.q1S} threshold`;
+    liveCall.textContent = '🔴 SLOW Q1 — Pull back / consider under';
+  } else {
+    assess.className = 'classification mixed';
+    assess.textContent = `🟡 BORDERLINE (${L.q1S}–${L.q1F} zone)`;
+    liveCall.textContent = '🟡 Borderline — wait for Q2 before acting';
+  }
+
+  // Benchmarks
+  renderQ1Benchmarks();
+}
+
+function renderQ1Benchmarks() {
+  const L = LEAGUES[state.league];
+  const el = document.getElementById('q1Benchmarks');
+  el.innerHTML = `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--mg);margin-bottom:8px">
+      ${state.league}
+    </div>
+    <div class="input-grid">
+      <div class="alert-item ok" style="flex-direction:column;text-align:center">
+        <span class="alert-label">Q1 Fast</span>
+        <span style="font-size:20px;font-weight:900">≥${L.q1F}</span>
+        <span style="font-size:11px">combined pts</span>
+      </div>
+      <div class="alert-item err" style="flex-direction:column;text-align:center">
+        <span class="alert-label">Q1 Slow</span>
+        <span style="font-size:20px;font-weight:900">&lt;${L.q1S}</span>
+        <span style="font-size:11px">combined pts</span>
+      </div>
+      <div class="alert-item blue" style="flex-direction:column;text-align:center">
+        <span class="alert-label">FGA Fast</span>
+        <span style="font-size:20px;font-weight:900">≥42</span>
+        <span style="font-size:11px">combined</span>
+      </div>
+      <div class="alert-item blue" style="flex-direction:column;text-align:center">
+        <span class="alert-label">3PA Fast</span>
+        <span style="font-size:20px;font-weight:900">≥14</span>
+        <span style="font-size:11px">combined</span>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FIXTURE LOG
+// ═══════════════════════════════════════════════════════════════════════
+function saveToLog() {
+  const r = state.analysis;
+  if (!r || r.invalid) {
+    showToast('⛔ Cannot save — incomplete data');
+    return;
+  }
+  const cls = getClassification(r.combined);
+  const secondary = (() => {
+    if (Math.abs(r.scoreA - r.scoreB) >= 3) return '⚡ PACE SPLIT — Consider 1st Half Over/Under';
+    if (r.avgFGPctA >= 0.50 && r.avgFGPctB >= 0.50) return '🔥 BOTH DEFENSES WEAK — Elevated scoring likely';
+    if (r.otRisk) return '⚠️ OT RISK ACTIVE — Under bets exposed to overtime';
+    if (r.alerts.find(a => a.label.includes('Blowout') && a.type === 'warn')) return '📉 BLOWOUT PATTERN — Under favoured';
+    if (r.alerts.find(a => a.label.includes('Ultra') && a.type === 'info')) return '🔵 ULTRA-SLOW — Check league tier';
+    return '📊 Review all alerts before deciding';
+  })();
+  const fixture = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('en-GB'),
+    dateISO: new Date().toISOString().split('T')[0],
+    league: state.league,
+    teamA: state.teamAName,
+    teamB: state.teamBName,
+    scoreA: r.scoreA,
+    scoreB: r.scoreB,
+    combined: r.combined,
+    classification: cls.cls,
+    suggestion: getSuggestion(r, r.combined),
+    secondary: secondary,
+    trapPct: r.trapPct,
+    conf: r.conf,
+    tempo: r.tempo,
+    otRisk: r.otRisk,
+    warnCount: r.warnCount,
+    alerts: r.alerts,
+    avgPtsA: parseFloat(r.avgPtsA.toFixed(1)),
+    avgFGAA: parseFloat(r.avgFGAA.toFixed(1)),
+    avgTPAA: parseFloat(r.avgTPAA.toFixed(1)),
+    avgPtsB: parseFloat(r.avgPtsB.toFixed(1)),
+    avgFGAB: parseFloat(r.avgFGAB.toFixed(1)),
+    avgTPAB: parseFloat(r.avgTPAB.toFixed(1)),
+    combFGA: parseFloat(r.combFGA.toFixed(1)),
+    r1A:r.r1A, r2A:r.r2A, r3A:r.r3A, r4A:r.r4A, r5A:r.r5A,
+    r1B:r.r1B, r2B:r.r2B, r3B:r.r3B, r4B:r.r4B, r5B:r.r5B,
+    leagueRange: LEAGUES[state.league] ? LEAGUES[state.league].range : '—',
+    h2hGames: JSON.parse(JSON.stringify(state.h2hGames)),
+    h2hStats: getH2HStats(),
+    notes: '',
+  };
+  const fixtures = getFixtures();
+  fixtures.unshift(fixture);
+  saveFixtures(fixtures);
+  showToast('✅ Saved to Fixture Log');
+}
+
+function renderFixtureLog() {
+  const fixtures = getFixtures();
+  const list = document.getElementById('fixtureList');
+  const empty = document.getElementById('fixtureEmpty');
+  const stats = document.getElementById('fixtureStats');
+
+  if (!fixtures.length) {
+    list.innerHTML = ''; empty.style.display = 'block'; stats.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none'; stats.style.display = 'block';
+
+  list.innerHTML = fixtures.map((f,i) => `
+    <div class="fixture-item" onclick="openFxDetail(${f.id})">
+      <div class="fixture-top">
+        <div>
+          <div class="fixture-teams">${f.teamA} vs ${f.teamB}</div>
+          <div class="fixture-date">${f.date} · ${f.league}</div>
+        </div>
+        <button class="fixture-delete no-print" onclick="event.stopPropagation();deleteFixture(${f.id})">🗑</button>
+      </div>
+      <div class="fixture-scores">
+        <span class="fixture-score-chip">A: ${f.scoreA}/10</span>
+        <span class="fixture-score-chip">B: ${f.scoreB}/10</span>
+        <span class="fixture-score-chip">Comb: ${f.combined}</span>
+        <span class="fixture-badge ${f.classification}">${f.classification.toUpperCase()}</span>
+        <span class="fixture-score-chip" style="color:${f.trapPct>=50?'var(--rf)':f.trapPct>=25?'var(--yf)':'var(--gf)'}">
+          Trap: ${f.trapPct}%
+        </span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--mg);line-height:1.3">${f.suggestion}</div>
+      <div class="fixture-tap-hint">👆 Tap to view full analysis</div>
+    </div>
+  `).join('');
+
+  // Stats
+  const total = fixtures.length;
+  const fast = fixtures.filter(f=>f.classification==='fast').length;
+  const mixed = fixtures.filter(f=>f.classification==='mixed').length;
+  const slow = fixtures.filter(f=>f.classification==='slow').length;
+  const avgComb = (fixtures.reduce((a,f)=>a+f.combined,0)/total).toFixed(1);
+
+  document.getElementById('fixtureStatsBody').innerHTML = `
+    <div class="rating-grid" style="gap:6px">
+      <div class="rating-item" style="text-align:center">
+        <div class="rating-item-label">Total Fixtures</div>
+        <div class="rating-score" style="font-size:28px">${total}</div>
+      </div>
+      <div class="rating-item" style="text-align:center">
+        <div class="rating-item-label">Avg Combined</div>
+        <div class="rating-score" style="font-size:28px">${avgComb}</div>
+      </div>
+      <div class="rating-item" style="text-align:center;border-color:var(--gf)">
+        <div class="rating-item-label" style="color:var(--gf)">Fast</div>
+        <div class="rating-score" style="font-size:28px;color:var(--gf)">${fast}</div>
+      </div>
+      <div class="rating-item" style="text-align:center;border-color:var(--yf)">
+        <div class="rating-item-label" style="color:var(--yf)">Mixed</div>
+        <div class="rating-score" style="font-size:28px;color:var(--yf)">${mixed}</div>
+      </div>
+      <div class="rating-item" style="text-align:center;border-color:var(--rf)">
+        <div class="rating-item-label" style="color:var(--rf)">Slow</div>
+        <div class="rating-score" style="font-size:28px;color:var(--rf)">${slow}</div>
+      </div>
+      <div class="rating-item" style="text-align:center">
+        <div class="rating-item-label">High Trap (≥50%)</div>
+        <div class="rating-score" style="font-size:28px;color:var(--yf)">${fixtures.filter(f=>f.trapPct>=50).length}</div>
+      </div>
+    </div>
+  `;
+}
+
+function deleteFixture(id) {
+  const fixtures = getFixtures().filter(f => f.id !== id);
+  saveFixtures(fixtures);
+  renderFixtureLog();
+  showToast('🗑 Fixture deleted');
+}
+
+function clearAllFixtures() {
+  if (!confirm('Clear all saved fixtures?')) return;
+  saveFixtures([]);
+  renderFixtureLog();
+  showToast('🗑 All fixtures cleared');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GUIDE
+// ═══════════════════════════════════════════════════════════════════════
+function renderGuide() {
+  document.getElementById('guideContent').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${[
+        ['STEP 1 — League Preset','Select the correct league. This calibrates ALL thresholds (points, FGA, 3PA, Q1 benchmarks) automatically.'],
+        ['STEP 2 — Enter Game Data','Fill last 3 games for both teams. Score, FGA, 3PA are required. Leave empty rather than entering 0.'],
+        ['STEP 3 — FG% Allowed','Enter as decimal: 0.47 = 47%. Found on team stats page under "Opp FG%". This is their defensive FG% allowed.'],
+        ['STEP 4 — Assists Allowed','From the OPPONENT\'s box score — how many assists the opponent had against this team. High = weak defense.'],
+        ['STEP 5 — Check Lockout','If ⛔ appears in data check, the model is blocked. Fill all 3 games before reading analysis.'],
+        ['STEP 6 — Read Analysis','Combined score + classification is the primary signal. Check trap alerts — 9 checks total.'],
+        ['STEP 7 — Q1 Tracker','Use the Live Q1 tab during the game. Enter Q1 pts + FGA. If Q1 is slow, lean under regardless of pre-game score.'],
+        ['MIXED ZONE 5–7','NEVER bet blind. Always confirm live. If Q1 combined < league Q1 fast threshold → lean under.'],
+        ['0% TRAP CAVEAT','0% trap risk does NOT mean safe. Verify volume data is complete. Check for OT risk and outlier shooting games.'],
+        ['OT RISK','When teams are closely matched (score diff ≤1) and combined ≥5, under bets are vulnerable to overtime.'],
+      ].map(([t,d]) => `
+        <div style="background:var(--dn);border-radius:8px;padding:10px;border:1px solid #1E3A5F">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:var(--ac);margin-bottom:4px">${t}</div>
+          <div style="font-size:12px;color:var(--lg);line-height:1.5">${d}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // League ref
+  const regions = {
+    '🇺🇸 North America': ['NBA','NCAA'],
+    '🏆 Top European': ['EuroLeague','FIBA Champions League','Turkish BSL','Spanish ACB','Italian Lega Basket','French Pro A','BBL (German)','Greek ESAKE','Israeli BSL','VTB United League'],
+    '🌍 Mid European': ['Adriatic (ABA)','Lithuanian LKL','Polish PLK','Czech NBL','Dutch DBL','Belgian EuroMillions','Slovenian Liga Nova KBM','Serbian KLS','Ukrainian SUPERLEAGUE'],
+    '🌿 Lower European': ['Georgian League','Swiss NLA','Hungarian NB I/A','Romanian LNBM','Portuguese LPB','Austrian ABL','Bosnian Premier League','Macedonian NLB'],
+    '❓ Other': ['Low-Tier / Unknown'],
+  };
+
+  let refHTML = '';
+  Object.entries(regions).forEach(([reg, leagues]) => {
+    refHTML += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:var(--ac);margin:10px 0 6px;text-transform:uppercase">${reg}</div>`;
+    refHTML += leagues.map(l => {
+      const d = LEAGUES[l];
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--dn);border-radius:6px;margin-bottom:4px;border:1px solid #1E3A5F">
+        <span style="font-size:12px;font-weight:600;color:var(--lg)">${l}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:var(--ac)">${d.range}</span>
+      </div>`;
+    }).join('');
+  });
+  document.getElementById('leagueRefContent').innerHTML = refHTML;
+
+  // Upgrade log
+  const upgrades = [
+    ['🔴 BUG FIX','Incomplete Data Lockout','If either team has <3 games, model shows ⛔ INVALID. Prevents false analysis.'],
+    ['🔴 BUG FIX','Low-Tier League Fix','"Others" replaced with "Low-Tier / Unknown" starting at 130 pts. No more false No Data.'],
+    ['🟣 NEW ALERT','OT Risk Flag','Fires when teams closely matched + combined ≥5. Under bets vulnerable to overtime.'],
+    ['🟣 NEW ALERT','Blowout Pattern Detector','Fires when any game had 21+ pt margin. Signals collapse team. Lean under.'],
+    ['🟣 NEW ALERT','Ultra-Slow Category','3PA ≤12 or total ≤130. Extreme low-volume flag beyond just SLOW.'],
+    ['🟣 NEW ALERT','Combined FGA Alert','Fires when combined FGA <115. Direct volume warning.'],
+    ['🟣 NEW ALERT','0% Trap Caveat','0% trap ≠ safe. Verify volume. Inspired by Gran Canaria loss.'],
+    ['🟡 IMPROVEMENT','30 League Presets','Added Czech NBL, Swiss NLA, Belgian, Dutch, Polish, Romanian, Portuguese, Austrian, Slovenian, Bosnian, Serbian, Macedonian, Ukrainian, VTB and more.'],
+    ['🟡 IMPROVEMENT','League-Calibrated Q1','Q1 thresholds adjust per league. EuroLeague fast=25, NBA=28, Low-tier=20.'],
+    ['🟡 IMPROVEMENT','9 Total Alerts','Expanded from 5 to 9. Trap % now out of 9.'],
+    ['📱 NEW','Android PWA','Full mobile app — works offline, installable, saves fixture history.'],
+  ];
+  document.getElementById('upgradeLogContent').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${upgrades.map(([tag,title,desc]) => `
+        <div style="background:var(--dn);border-radius:8px;padding:10px;border:1px solid #1E3A5F">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;font-weight:700;color:var(--mg)">${tag}</span>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:var(--ac)">${title}</span>
+          </div>
+          <div style="font-size:12px;color:var(--lg);line-height:1.4">${desc}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1: RESET
+// ═══════════════════════════════════════════════════════════════
+function confirmReset() {
+  if (!confirm('Reset all input data?\nLeague, team names, game scores and defensive stats will be cleared.\n\nSaved Fixture Log is NOT affected.')) return;
+  state.league = 'EuroLeague';
+  state.teamAName = 'TEAM A'; state.teamBName = 'TEAM B';
+  state.gamesA = [{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0}];
+  state.gamesB = [{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0},{ts:0,os:0,fga:0,tpa:0}];
+  state.defA = [{fgPct:0,ast:0},{fgPct:0,ast:0},{fgPct:0,ast:0}];
+  state.defB = [{fgPct:0,ast:0},{fgPct:0,ast:0},{fgPct:0,ast:0}];
+  state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}]; state.analysis = null;
+  saveState();
+  buildInputUI(); buildH2HUI();
+  showToast('🔄 All inputs cleared');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1: FIXTURE DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════
+function openFxDetail(id) {
+  const fixtures = getFixtures();
+  const f = fixtures.find(x => x.id === id);
+  if (!f) return;
+
+  const cls = getClassification(f.combined);
+  const cats = ['Total Pts Trend','Shot Vol (FGA)','3-Point Vol','Defense Weakness','H2H Bonus'];
+  const maxs = [3,3,2,2,2];
+  const sA = [f.r1A,f.r2A,f.r3A,f.r4A,f.r5A];
+  const sB = [f.r1B,f.r2B,f.r3B,f.r4B,f.r5B];
+
+  const ratingsHTML = cats.map((c,i) => `
+    <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:8px;border:1px solid #1E3A5F;margin-bottom:5px">
+      <div style="font-size:10px;color:var(--mg);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${c}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--ac);min-width:22px">A:${sA[i]??'—'}</span>
+        <div style="flex:1;height:5px;background:#1E3A5F;border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${((sA[i]??0)/maxs[i])*100}%;background:var(--ac);border-radius:3px"></div>
+        </div>
+        <span style="font-size:11px;color:#93C5FD;min-width:22px">B:${sB[i]??'—'}</span>
+        <div style="flex:1;height:5px;background:#1E3A5F;border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${((sB[i]??0)/maxs[i])*100}%;background:var(--mb);border-radius:3px"></div>
+        </div>
+        <span style="font-size:10px;color:var(--mg)">/${maxs[i]}</span>
+      </div>
+    </div>`).join('');
+
+  const alertsHTML = (f.alerts || []).map(a => `
+    <div class="alert-item ${a.type}" style="margin-bottom:4px">
+      <div><span class="alert-label">${a.label}</span>${a.msg}</div>
+    </div>`).join('');
+
+  document.getElementById('fxModalTitle').textContent = `${f.teamA} vs ${f.teamB}`;
+  document.getElementById('fxModalBody').innerHTML = `
+    <div style="font-size:10px;color:var(--mg);margin-bottom:12px">${f.date} · ${f.league}</div>
+
+    <!-- Score boxes -->
+    <div class="score-display">
+      <div class="score-box team-a">
+        <div class="score-box-label">Team A</div>
+        <div class="score-box-name">${f.teamA}</div>
+        <div class="score-box-number">${f.scoreA}<span class="score-box-denom">/10</span></div>
+      </div>
+      <div class="score-box team-b">
+        <div class="score-box-label">Team B</div>
+        <div class="score-box-name">${f.teamB}</div>
+        <div class="score-box-number">${f.scoreB}<span class="score-box-denom">/10</span></div>
+      </div>
+      <div class="score-box combined">
+        <div class="score-box-label">Combined</div>
+        <div class="score-box-name">Score</div>
+        <div class="score-box-number">${f.combined}<span class="score-box-denom">/10</span></div>
+      </div>
+    </div>
+
+    <!-- Classification -->
+    <div class="classification ${cls.cls}" style="margin-bottom:10px">${cls.text}</div>
+
+    <!-- Meters -->
+    <div class="meter-row">
+      <div class="meter-box">
+        <div class="meter-label">Trap Risk</div>
+        <div class="meter-value trap" style="color:${f.trapPct>=60?'var(--rf)':f.trapPct>=30?'var(--yf)':'var(--gf)'}">${f.trapPct}%</div>
+      </div>
+      <div class="meter-box">
+        <div class="meter-label">Confidence</div>
+        <div class="meter-value conf">${f.conf||'—'}%</div>
+      </div>
+      <div class="meter-box">
+        <div class="meter-label">OT Risk</div>
+        <div class="meter-value" style="color:${f.otRisk?'var(--yf)':'var(--gf)'}">${f.otRisk?'⚠️ YES':'✅ Low'}</div>
+      </div>
+    </div>
+
+    <!-- Tempo -->
+    <div class="modal-section-label">Tempo Control</div>
+    <div class="suggestion-secondary" style="text-align:center;font-weight:700;font-size:14px">${f.tempo||'—'}</div>
+
+    <!-- Suggestion -->
+    <div class="modal-section-label">Suggestion</div>
+    <div class="suggestion-main" style="font-size:15px">${f.suggestion}</div>
+    <div class="suggestion-secondary" style="font-size:12px;margin-top:6px">${f.secondary||''}</div>
+
+    <!-- H2H Panel v3.2 -->
+    ${(f.h2hStats && f.h2hStats.count > 0) ? `
+    <div class="modal-section-label">H2H Record (${f.h2hStats.count} games)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid #1E3A5F;text-align:center">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--ac)">${f.h2hStats.aWins}–${f.h2hStats.bWins}</div>
+        <div style="font-size:9px;color:var(--mg);text-transform:uppercase;letter-spacing:.5px">Win Record A–B</div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid #1E3A5F;text-align:center">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--lb)">${f.h2hStats.avgTotal}</div>
+        <div style="font-size:9px;color:var(--mg);text-transform:uppercase;letter-spacing:.5px">Avg H2H Total</div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid #1E3A5F;text-align:center">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--gf)">±${f.h2hStats.avgMargin}</div>
+        <div style="font-size:9px;color:var(--mg);text-transform:uppercase;letter-spacing:.5px">Avg Margin</div>
+      </div>
+    </div>
+    <div style="padding:8px 10px;background:rgba(0,0,0,.15);border-radius:8px;border:1px solid #1E3A5F;font-size:12px;color:var(--mg);margin-bottom:6px">
+      Scoring trend: <b style="color:${f.h2hStats.trend==='rising'?'#6EE7B7':f.h2hStats.trend==='falling'?'#FCA5A5':'var(--mg)'}">${f.h2hStats.trend==='rising'?'📈 Rising':f.h2hStats.trend==='falling'?'📉 Falling':'➡️ Stable'}</b>
+      &nbsp;·&nbsp; H2H games: ${f.h2hStats.totals.join(', ')} pts
+    </div>` : ''}
+
+    <!-- Averages -->
+    <div class="modal-section-label">3-Game Averages</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid #1E3A5F">
+        <div style="font-size:10px;color:var(--ac);font-weight:700;margin-bottom:5px">TEAM A</div>
+        <div style="font-size:11px;color:var(--mg);line-height:1.9">
+          Avg Total: <b style="color:var(--wh)">${f.avgPtsA||'—'}</b><br>
+          Avg FGA: <b style="color:var(--wh)">${f.avgFGAA||'—'}</b><br>
+          Avg 3PA: <b style="color:var(--wh)">${f.avgTPAA||'—'}</b>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid #1E3A5F">
+        <div style="font-size:10px;color:#93C5FD;font-weight:700;margin-bottom:5px">TEAM B</div>
+        <div style="font-size:11px;color:var(--mg);line-height:1.9">
+          Avg Total: <b style="color:var(--wh)">${f.avgPtsB||'—'}</b><br>
+          Avg FGA: <b style="color:var(--wh)">${f.avgFGAB||'—'}</b><br>
+          Avg 3PA: <b style="color:var(--wh)">${f.avgTPAB||'—'}</b>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;padding:8px;background:rgba(0,0,0,.2);border-radius:8px;margin-top:6px;border:1px solid #1E3A5F">
+      <span style="font-size:11px;color:var(--mg)">Combined FGA: </span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:${parseFloat(f.combFGA||0)<115?'var(--yf)':'var(--gf)'}">${f.combFGA||'—'}</span>
+      <span style="font-size:11px;color:${parseFloat(f.combFGA||0)<115?'var(--yf)':'var(--gf)'}">${parseFloat(f.combFGA||0)<115?' ⚠️ LOW':' ✅'}</span>
+    </div>
+
+    <!-- Rating Breakdown -->
+    <div class="modal-section-label">Rating Breakdown (A vs B)</div>
+    ${ratingsHTML}
+
+    <!-- Alerts -->
+    <div class="modal-section-label">Alert Summary (${f.warnCount||0}/9 warnings)</div>
+    ${alertsHTML || '<div class="alert-item ok">All 9 checks passed</div>'}
+
+    <button class="btn" style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid #253A55;color:var(--mg)" onclick="closeFxModal()">✕ Close</button>
+  `;
+
+  document.getElementById('fxDetailModal').classList.add('active');
+  document.getElementById('fxDetailModal').scrollTop = 0;
+}
+
+function closeFxModal() {
+  document.getElementById('fxDetailModal').classList.remove('active');
+}
+
+// Close modal on overlay tap
+
+// ════════════════════════════════════════════════════════════════
+// GEMINI AI AUTOFILL ENGINE
+// Uses Gemini 2.0 Flash + Google Search grounding
+// Works on GitHub Pages — no CORS issues
+// ════════════════════════════════════════════════════════════════
+
+// ── Key storage ───────────────────────────────────────────────
+const _GK = 'bma_gemini_key_v1';
+
+function getGeminiKey() {
+  return localStorage.getItem(_GK) || '';
+}
+
+function saveGeminiKey() {
+  const val = (document.getElementById('geminiKeyInput')?.value || '').trim();
+  if (!val) { setKeyStatus('Enter a key first', 'warn'); return; }
+  localStorage.setItem(_GK, val);
+  setKeyStatus('Key saved!', 'ok');
+}
+
+function toggleGeminiVis() {
+  const inp = document.getElementById('geminiKeyInput');
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function setKeyStatus(msg, type) {
+  const el = document.getElementById('geminiKeyStatus');
+  if (!el) return;
+  const colors = { ok: '#6EE7B7', warn: '#FCD34D', fail: '#FCA5A5' };
+  el.style.color = colors[type] || '#94A3B8';
+  el.textContent = msg;
+}
+
+async function testGeminiKey() {
+  const key = getGeminiKey();
+  if (!key) { setKeyStatus('No key saved — paste and save first', 'warn'); return; }
+  setKeyStatus('Checking key…', 'warn');
+  // Step 1: list available models to find what this key can use
+  try {
+    const lr = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models?key=' + key + '&pageSize=50',
+      { method: 'GET' }
+    );
+    if (!lr.ok) {
+      const d = await lr.json().catch(() => ({}));
+      setKeyStatus('Invalid key: ' + ((d.error && d.error.message) || lr.status), 'fail');
+      return;
+    }
+    const ld = await lr.json();
+    const names = (ld.models || []).map(function(m){ return m.name.replace('models/',''); });
+    console.log('Available models:', names);
+    // Step 2: try a quick generate with best available free model
+    const prefer = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite'];
+    const candidate = prefer.find(function(m){ return names.some(function(n){ return n === m || n.startsWith(m); }); }) || names.find(function(n){ return n.includes('flash'); });
+    if (!candidate) { setKeyStatus('Key valid but no flash models found. Check AI Studio.', 'warn'); return; }
+    setKeyStatus('Testing with ' + candidate + '…', 'warn');
+    const gr = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + candidate + ':generateContent?key=' + key,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with just: OK' }] }] }) }
+    );
+    const gd = await gr.json();
+    if (gr.ok) {
+      setKeyStatus('\u2705 Key works! Best model: ' + candidate, 'ok');
+    } else {
+      const msg = (gd.error && gd.error.message) ? gd.error.message : String(gr.status);
+      if (msg.toLowerCase().includes('quota') || gr.status === 429) {
+        setKeyStatus('Key is valid but quota exceeded right now. Wait 1 min and retry.', 'warn');
+      } else {
+        setKeyStatus('Error: ' + msg, 'fail');
+      }
+    }
+  } catch(e) { setKeyStatus('Network error: ' + e.message, 'fail'); }
+}
+
+// On settings open, pre-fill saved key
+function onSettingsOpen() {
+  const inp = document.getElementById('geminiKeyInput');
+  if (inp) {
+    const k = getGeminiKey();
+    inp.value = k ? k.slice(0,6) + '…' + k.slice(-4) : '';
+  }
+}
+
+// ── Stubs for unused legacy functions ─────────────────────────
+function getKey()       { return getGeminiKey(); }
+function updateDot()    {}
+function refreshUsage() {}
+function toggleApiVis() {}
+function saveApiKey()   {}
+function testApiKey()   {}
+function fetchUpcomingFixtures() {}
+function onFixtureSelect() {}
+
+// ── showFetchStatus ───────────────────────────────────────────
+function showFetchStatus(type, msg, filled, warnings) {
+  const el = document.getElementById('fetchStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  const colors = { success: 'rgba(16,185,129,.15)', partial: 'rgba(245,158,11,.12)', failed: 'rgba(239,68,68,.12)', loading: 'rgba(26,115,232,.12)' };
+  const borders = { success: 'rgba(16,185,129,.3)', partial: 'rgba(245,158,11,.25)', failed: 'rgba(239,68,68,.25)', loading: 'rgba(26,115,232,.25)' };
+  el.style.cssText = `display:block;padding:10px 12px;border-radius:8px;font-size:12px;background:${colors[type]||colors.loading};border:1px solid ${borders[type]||borders.loading};margin-top:8px`;
+  let h = `<div style="font-weight:700;margin-bottom:${filled.length||warnings.length?'6px':'0'};color:var(--wh)">${msg}</div>`;
+  if (filled.length) {
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">';
+    filled.forEach(f => { h += `<span style="background:rgba(16,185,129,.15);color:#6EE7B7;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${f}</span>`; });
+    h += '</div>';
+  }
+  if (warnings.length) {
+    h += '<div style="margin-top:4px;font-size:11px;color:#FCD34D">';
+    warnings.forEach(w => { h += `<div>&#9888;&#65039; ${w}</div>`; });
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+// ── markAutofilled (flash animation) ─────────────────────────
+function markAutofilled() {
+  const ids = [];
+  ['A','B'].forEach(t => [0,1,2].forEach(i => {
+    [`g${t}${i}ts`,`g${t}${i}os`,`g${t}${i}fga`,`g${t}${i}tpa`,`d${t}${i}fg`,`d${t}${i}ast`]
+      .forEach(id => ids.push(id));
+  }));
+  [0,1,2].forEach(i => { ids.push(`h2h${i}a`); ids.push(`h2h${i}b`); });
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value && parseFloat(el.value) !== 0) {
+      el.style.transition = 'background .3s';
+      el.style.background = 'rgba(26,115,232,.25)';
+      setTimeout(() => { el.style.background = ''; }, 3000);
+    }
+  });
+}
+
+// ── Build the prompt ──────────────────────────────────────────
+function buildGeminiPrompt(teamA, teamB, today) {
+  var p = '';
+  p += 'Basketball stats research. Today: ' + today + '.\n';
+  p += 'Teams: A=' + teamA + '  B=' + teamB + '\n\n';
+
+  p += 'TASK 1 — Last 3 completed games for ' + teamA + ':\n';
+  p += 'Search SofaScore or Flashscore for "' + teamA + ' basketball results". ';
+  p += 'For each game open the BOX SCORE. Record:\n';
+  p += '  teamScore = ' + teamA + ' final score\n';
+  p += '  oppScore = opponent final score\n';
+  p += '  fga = ' + teamA + ' field goal attempts (from ' + teamA + ' box score row)\n';
+  p += '  tpa = ' + teamA + ' 3-point attempts\n';
+  p += '  defFgPct = OPPONENT field goal % in that game (opponent FGM/FGA, decimal e.g. 0.452)\n';
+  p += '  assistsAllowed = OPPONENT total assists in that game\n\n';
+
+  p += 'TASK 2 — Last 3 completed games for ' + teamB + ' (same method).\n\n';
+
+  p += 'TASK 3 — Head-to-head: search "' + teamA + ' vs ' + teamB + ' basketball history". ';
+  p += 'Find the 3 most recent direct matchups. If only 2 exist return 2, if only 1 exists return 1. ';
+  p += 'For h2hGames: a = ' + teamA + ' score, b = ' + teamB + ' score, date = YYYY-MM-DD.\n\n';
+
+  p += 'OUTPUT: return ONLY a raw JSON object — no markdown fences, no text outside the JSON.\n';
+  p += 'All arrays must have exactly 3 items (use nulls for unavailable values).\n';
+  p += 'Example structure:\n';
+  p += '{"teamA":"' + teamA + '","teamB":"' + teamB + '",';
+  p += '"gamesA":[';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":85,"oppScore":73,"fga":72,"tpa":22,"defFgPct":0.441,"assistsAllowed":18},';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":91,"oppScore":80,"fga":75,"tpa":25,"defFgPct":0.458,"assistsAllowed":21},';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":78,"oppScore":82,"fga":70,"tpa":20,"defFgPct":0.471,"assistsAllowed":23}';
+  p += '],';
+  p += '"gamesB":[';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":88,"oppScore":76,"fga":74,"tpa":24,"defFgPct":0.445,"assistsAllowed":19},';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":95,"oppScore":89,"fga":78,"tpa":27,"defFgPct":0.462,"assistsAllowed":22},';
+  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":82,"oppScore":85,"fga":71,"tpa":21,"defFgPct":0.453,"assistsAllowed":20}';
+  p += '],';
+  p += '"h2hGames":[';
+  p += '{"a":85,"b":80,"date":"2026-01-15"},';
+  p += '{"a":78,"b":82,"date":"2025-11-20"},';
+  p += '{"a":90,"b":88,"date":"2025-04-10"}';
+  p += '],"dataQuality":"full","sources":["SofaScore"]}';
+  return p;
+}
+
+// ── Parse JSON from response ──────────────────────────────────
+function parseStatsJson(text) {
+  if (!text) return null;
+
+  // Gemini with search grounding sometimes returns two JSON blocks concatenated.
+  // Strategy: strip fences, find ALL {...} candidates, try largest-first, pick
+  // the one that has the expected shape (gamesA / gamesB keys).
+
+  // 1. Strip all markdown code fences
+  let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  // 2. Collect every top-level {...} block by scanning for balanced braces
+  const candidates = [];
+  let depth = 0, start = -1;
+  for (let i = 0; i < clean.length; i++) {
+    if (clean[i] === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (clean[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        candidates.push(clean.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+
+  // 3. Sort largest first (the full stats object is the biggest block)
+  candidates.sort(function(a, b) { return b.length - a.length; });
+
+  // 4. Return the first one that parses AND has gamesA or gamesB
+  for (var i = 0; i < candidates.length; i++) {
+    try {
+      var obj = JSON.parse(candidates[i]);
+      if (obj && (obj.gamesA || obj.gamesB)) return obj;
+    } catch(_) {}
+  }
+
+  // 5. Fallback: return any parseable object
+  for (var j = 0; j < candidates.length; j++) {
+    try { return JSON.parse(candidates[j]); } catch(_) {}
+  }
+
+  return null;
+}
+
+// ── Apply stats to state (index 0 = most recent) ──────────────
+function applyStats(stats, teamA, teamB) {
+  const filled = [], warnings = [];
+
+  // Sort games most-recent-first by date in gameLabel
+  function sortGames(arr) {
+    if (!arr || !arr.length) return arr;
+    var dated = arr.map(function(g) {
+      var m = (g.gameLabel || '').match(/(\d{4}-\d{2}-\d{2})/);
+      return { g: g, date: m ? m[1] : null };
+    });
+    var hasDates = dated.filter(function(d) { return d.date; }).length >= 2;
+    if (hasDates) {
+      dated.sort(function(a, b) {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return b.date.localeCompare(a.date);
+      });
+    }
+    return dated.map(function(d) { return d.g; });
+  }
+
+  // Estimate defensive stats from oppScore when box score data unavailable.
+  // defFgPct: oppScore / (oppScore / leagueAvgFgPct) — rearranged:
+  //   league avg FGA ≈ oppScore / leagueAvgFgPct / 2  (accounting for FTs)
+  //   simpler: defFgPct ≈ oppScore / (oppScore + 38) capped 0.38–0.54
+  //   (38 is approximate pts from FT + offensive rebounds at league avg)
+  // assistsAllowed: league avg ≈ oppScore / 5.2 (rough: ~20 ast per 104 pts)
+  function estimateDefStats(oppScore) {
+    if (oppScore == null || oppScore <= 0) return { fgPct: null, ast: null };
+    // FG% estimate: points allowed correlates ~0.45 center; adjust by score
+    var fgPct = Math.min(0.54, Math.max(0.38, (oppScore - 10) / (oppScore * 2.15)));
+    fgPct = parseFloat(fgPct.toFixed(3));
+    // Assists: roughly 1 assist per 5 pts scored
+    var ast = Math.round(Math.min(32, Math.max(14, oppScore / 5.1)));
+    return { fgPct: fgPct, ast: ast };
+  }
+
+  function fillGames(gamesArr, stateGames, stateDef, teamName) {
+    var games = sortGames(gamesArr);
+    if (!games || games.length === 0) {
+      warnings.push(teamName + ' games not found — fill manually');
+      return;
+    }
+    var defFoundCount = 0;
+    var defEstCount = 0;
+    games.slice(0, 3).forEach(function(g, i) {
+      if (g.teamScore      != null) stateGames[i].ts  = Math.round(+g.teamScore);
+      if (g.oppScore       != null) stateGames[i].os  = Math.round(+g.oppScore);
+      if (g.fga            != null) stateGames[i].fga = Math.round(+g.fga);
+      if (g.tpa            != null) stateGames[i].tpa = Math.round(+g.tpa);
+
+      if (g.defFgPct != null && +g.defFgPct > 0) {
+        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(3));
+        defFoundCount++;
+      } else {
+        // Estimate from oppScore
+        var est = estimateDefStats(g.oppScore != null ? +g.oppScore : stateGames[i].os);
+        if (est.fgPct != null) { stateDef[i].fgPct = est.fgPct; defEstCount++; }
+      }
+
+      if (g.assistsAllowed != null && +g.assistsAllowed > 0) {
+        stateDef[i].ast = Math.round(+g.assistsAllowed);
+      } else {
+        var os = g.oppScore != null ? +g.oppScore : stateGames[i].os;
+        var estAst = estimateDefStats(os).ast;
+        if (estAst != null) stateDef[i].ast = estAst;
+      }
+    });
+    filled.push(teamName + ': ' + Math.min(games.length, 3) + ' games');
+    if (defFoundCount > 0) {
+      filled.push(teamName + ' def stats: ' + defFoundCount + '/3 real' + (defEstCount > 0 ? ', ' + defEstCount + ' estimated' : ''));
+    } else if (defEstCount > 0) {
+      filled.push(teamName + ' def stats: ' + defEstCount + '/3 estimated from score');
+      warnings.push(teamName + ' defensive FG% & assists estimated from score — verify on SofaScore box score');
+    }
+  }
+
+  fillGames(stats.gamesA || [], state.gamesA, state.defA, teamA);
+  fillGames(stats.gamesB || [], state.gamesB, state.defB, teamB);
+
+  // H2H — always reset all 3 slots to null first so old data doesn't bleed in
+  state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}];
+  if (stats.h2hGames && stats.h2hGames.length > 0) {
+    var h2h = stats.h2hGames.slice().sort(function(a,b) {
+      if (!a.date || !b.date) return 0;
+      return b.date.localeCompare(a.date);
+    });
+    h2h.slice(0, 3).forEach(function(g, i) {
+      if (g.a != null) state.h2hGames[i].a = Math.round(+g.a);
+      if (g.b != null) state.h2hGames[i].b = Math.round(+g.b);
+    });
+    filled.push('H2H: ' + Math.min(h2h.length, 3) + ' result(s) — remaining slots left blank');
+    if (h2h.length < 3) warnings.push('Only ' + h2h.length + ' H2H game(s) found — slot(s) ' + (h2h.length+1) + '-3 left blank');
+  } else {
+    warnings.push('No H2H history found — fill manually');
+  }
+
+  if (stats.dataQuality === 'estimated') warnings.push('Data quality flagged as estimated — spot-check on SofaScore');
+  if (stats.sources && stats.sources.length) filled.push('Sources: ' + stats.sources.join(', '));
+
+  buildInputUI();
+  buildH2HUI();
+  checkDataCompleteness();
+  saveState();
+  markAutofilled();
+
+  var noGames = warnings.filter(function(w) { return w.indexOf('not found') !== -1 && w.indexOf('H2H') === -1; }).length > 0;
+  var q = noGames ? 'failed' : (warnings.length === 0 ? 'success' : 'partial');
+
+  showFetchStatus(q,
+    q === 'success'
+      ? '&#10003; ' + teamA + ' vs ' + teamB + ' fully filled! Select League Preset below.'
+      : q === 'partial'
+      ? '&#9203; ' + teamA + ' vs ' + teamB + ' filled (some stats estimated). Review warnings.'
+      : '&#10060; Limited data. Fill missing fields manually.',
+    filled, warnings
+  );
+}
+
+// ── MAIN: Gemini Autofill ─────────────────────────────────────
+async function geminiAutofill() {
+  const teamA = (document.getElementById('claudeTeamA')?.value || '').trim();
+  const teamB = (document.getElementById('claudeTeamB')?.value || '').trim();
+
+  if (!teamA || !teamB) {
+    showFetchStatus('failed', 'Enter both team names above first.', [], []);
+    return;
+  }
+
+  const key = getGeminiKey();
+  if (!key) {
+    showFetchStatus('failed',
+      'No Gemini API key saved. Go to Settings to add your free key from aistudio.google.com',
+      [], []);
+    return;
+  }
+
+  const btn = document.getElementById('geminiAutofillBtn');
+  const sp  = document.getElementById('geminiSpinner');
+  if (btn) btn.disabled = true;
+  if (sp)  sp.style.display = 'inline-block';
+
+  // Set team names immediately
+  state.teamAName = teamA;
+  state.teamBName = teamB;
+  const tAEl = document.getElementById('teamAName');
+  const tBEl = document.getElementById('teamBName');
+  if (tAEl) tAEl.value = teamA;
+  if (tBEl) tBEl.value = teamB;
+
+  const today = new Date().toISOString().split('T')[0];
+  showFetchStatus('loading', `Gemini is searching for ${teamA} vs ${teamB} stats…`, [], []);
+
+  try {
+    const prompt = buildGeminiPrompt(teamA, teamB, today);
+
+    // Model fallback chain — current free-tier models as of May 2026
+    // gemini-2.5-flash-lite: 15 RPM, 1000 RPD free
+    // gemini-2.5-flash:      10 RPM,  500 RPD free  
+    // gemini-2.0-flash:      retiring 2026-06-01, skip unless others fail
+    // Current working free-tier models (May 2026) — no preview/sunset IDs
+    const MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
+
+    async function tryModel(model) {
+      const body = {
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+      };
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = (data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
+        const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+        const isNotFound = res.status === 404 || msg.toLowerCase().includes('not found');
+        throw Object.assign(new Error(msg), { isQuota, isNotFound, model });
+      }
+      return data;
+    }
+
+    let data = null;
+    let usedModel = '';
+    let lastErr = null;
+
+    for (const model of MODELS) {
+      try {
+        showFetchStatus('loading', 'Searching with ' + model + '\u2026', [], []);
+        data = await tryModel(model);
+        usedModel = model;
+        break;
+      } catch(e) {
+        lastErr = e;
+        console.warn('Model ' + model + ' failed:', e.message);
+        if (e.isQuota || e.isNotFound) continue; // try next model
+        break; // hard error (bad key, network) — stop
+      }
+    }
+
+    if (!data) throw lastErr || new Error('All models failed. Check your API key or wait 1 min and retry.');
+
+    // Extract text — Gemini search grounding can duplicate blocks or split content.
+    // Collect all non-empty text parts, deduplicate by 80-char prefix, join.
+    var rawParts = (data.candidates || [])
+      .reduce(function(acc, c) {
+        var parts = (c.content && c.content.parts) ? c.content.parts : [];
+        return acc.concat(parts);
+      }, [])
+      .filter(function(p) { return p.text && p.text.trim().length > 10; })
+      .map(function(p) { return p.text.trim(); });
+
+    var seen = {};
+    var uniqueParts = rawParts.filter(function(t) {
+      var key = t.slice(0, 80);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+
+    var text = uniqueParts.join('\n');
+    if (!text) throw new Error(usedModel + ' returned empty response. Try again.');
+
+    var stats = parseStatsJson(text);
+    if (!stats) {
+      console.error('=== RAW GEMINI RESPONSE ===');
+      console.error(text);
+      var hasJson = text.indexOf('"gamesA"') !== -1 || text.indexOf('"gamesB"') !== -1;
+      var hint = hasJson
+        ? 'JSON found but incomplete (truncated). Retry — if it keeps failing, the model is having trouble with this matchup.'
+        : 'Model returned plain text, not JSON. Retry once.';
+      throw new Error(usedModel + ': ' + hint);
+    }
+
+    if (stats.sources) stats.sources.unshift(usedModel);
+    else stats.sources = [usedModel];
+
+    applyStats(stats, teamA, teamB);
+
+  } catch(e) {
+    const isQuota = e.message?.toLowerCase().includes('quota') || e.isQuota;
+    showFetchStatus('failed',
+      isQuota
+        ? 'All free-tier models are quota-limited. Wait ~1 min and retry, or go to aistudio.google.com to enable billing (still very cheap). You can also try a different API key.'
+        : 'Gemini error: ' + e.message,
+      [], []
+    );
+    console.error('Gemini autofill error:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (sp)  sp.style.display = 'none';
+  }
+}
+
+// ── Keep claudeAutofill as alias for backwards compat ─────────
+async function claudeAutofill() { return geminiAutofill(); }
+
+// modal close on overlay tap — handled in main DOMContentLoaded below
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1: PRINT / PDF
+// ═══════════════════════════════════════════════════════════════
+function printFixtures() {
+  const fixtures = getFixtures();
+  if (!fixtures.length) { showToast('No fixtures to print'); return; }
+
+  const total = fixtures.length;
+  const fast  = fixtures.filter(f=>f.classification==='fast').length;
+  const mixed = fixtures.filter(f=>f.classification==='mixed').length;
+  const slow  = fixtures.filter(f=>f.classification==='slow').length;
+  const avgC  = (fixtures.reduce((a,f)=>a+f.combined,0)/total).toFixed(1);
+
+  const fixtureRows = fixtures.map((f,i) => {
+    const warn = (f.alerts||[]).filter(a=>a.type==='warn').map(a=>a.label).join(', ') || 'None';
+    const P = buildPredictionData(f);
+    const predLines = P.predictions.map(p => `<span style="display:inline-block;background:${p.bg};color:${p.color};padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;margin-right:4px">${p.label}</span>`).join('');
+    const reasonLines = P.reasons.map(r => `<li>${r.text}</li>`).join('');
+    return `
+      <div style="page-break-inside:avoid;border:1px solid #D1D5DB;border-radius:6px;padding:12px;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:900;color:#0D1B2A">${i+1}. ${f.teamA} vs ${f.teamB}</div>
+        <div style="font-size:10px;color:#6B7280;margin-bottom:6px">${f.date} · ${f.league} · Typical: ${f.leagueRange||'—'}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:5px;align-items:center">
+          <span style="background:#F1F5F9;padding:3px 8px;border-radius:4px;font-weight:700;font-size:11px">A: ${f.scoreA}/10</span>
+          <span style="background:#F1F5F9;padding:3px 8px;border-radius:4px;font-weight:700;font-size:11px">B: ${f.scoreB}/10</span>
+          <span style="background:#F1F5F9;padding:3px 8px;border-radius:4px;font-weight:700;font-size:11px">Combined: ${f.combined}/10</span>
+          <span style="padding:3px 10px;border-radius:4px;font-weight:800;font-size:11px;background:${f.classification==='fast'?'#DCFCE7':f.classification==='slow'?'#FEE2E2':'#FEF9C3'};color:${f.classification==='fast'?'#166534':f.classification==='slow'?'#991B1B':'#92400E'}">${f.classification.toUpperCase()}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <span style="background:#F8FAFC;padding:2px 6px;border-radius:3px;font-size:10px">Trap: ${f.trapPct}%</span>
+          <span style="background:#F8FAFC;padding:2px 6px;border-radius:3px;font-size:10px">Confidence: ${f.conf||'—'}%</span>
+          <span style="background:#F8FAFC;padding:2px 6px;border-radius:3px;font-size:10px">OT Risk: ${f.otRisk?'⚠️ YES':'Low'}</span>
+          <span style="background:#F8FAFC;padding:2px 6px;border-radius:3px;font-size:10px">FGA: ${f.combFGA||'—'}</span>
+          <span style="background:#F8FAFC;padding:2px 6px;border-radius:3px;font-size:10px">Tempo: ${f.tempo||'—'}</span>
+          ${f.h2hStats && f.h2hStats.count > 0 ? `<span style="background:#FFF7ED;padding:2px 6px;border-radius:3px;font-size:10px;color:#C2410C">H2H: ${f.h2hStats.aWins}–${f.h2hStats.bWins} | Avg ${f.h2hStats.avgTotal}pts | ±${f.h2hStats.avgMargin} margin</span>` : ''}
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:4px">${f.suggestion}</div>
+        <div style="font-size:11px;color:#6B7280;margin-bottom:8px">${f.secondary||''}</div>
+        <div style="background:#FFFBEB;border-left:3px solid #F59E0B;padding:8px 10px;border-radius:0 6px 6px 0">
+          <div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;margin-bottom:5px">📌 Predictions (${P.conf}% conf · ${P.stars})</div>
+          <div style="margin-bottom:5px">${predLines}</div>
+          <ul style="margin:0;padding-left:16px;font-size:11px;color:#374151;line-height:1.7">${reasonLines}</ul>
+        </div>
+      </div>`;
+  }).join('');
+
+  const printHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>BMA v3.1 — Fixture Report ${new Date().toLocaleDateString('en-GB')}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:20px;max-width:820px;margin:0 auto}
+    h1{font-size:20px;margin:0 0 3px}
+    .hd{text-align:center;border-bottom:3px solid #F59E0B;padding-bottom:12px;margin-bottom:16px}
+    .hd p{font-size:11px;color:#6B7280;margin:3px 0}
+    .sum{display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:#F8FAFC;border-radius:6px;margin-bottom:16px}
+    .si{text-align:center;min-width:55px}
+    .sn{font-size:22px;font-weight:900;color:#1E3A5F;display:block}
+    .sl{font-size:9px;color:#6B7280;text-transform:uppercase}
+    @media print{body{padding:8px}@page{margin:1cm}}
+  </style></head><body>
+  <div class="hd">
+    <h1>🏀 Basketball Matchup Analyzer v3.1</h1>
+    <p>Fixture Log & Prediction Report · Generated: ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+    <p>For analytical and educational purposes only. Not betting or financial advice.</p>
+  </div>
+  <div class="sum">
+    <div class="si"><span class="sn">${total}</span><span class="sl">Total</span></div>
+    <div class="si"><span class="sn" style="color:#166534">${fast}</span><span class="sl">Fast</span></div>
+    <div class="si"><span class="sn" style="color:#92400E">${mixed}</span><span class="sl">Mixed</span></div>
+    <div class="si"><span class="sn" style="color:#991B1B">${slow}</span><span class="sl">Slow</span></div>
+    <div class="si"><span class="sn">${avgC}</span><span class="sl">Avg Score</span></div>
+    <div class="si"><span class="sn" style="color:#D97706">${fixtures.filter(f=>f.trapPct>=50).length}</span><span class="sl">High Trap</span></div>
+  </div>
+  <h3 style="font-size:13px;color:#1E3A5F;margin-bottom:12px">All ${total} Fixture${total!==1?'s':''} with Predictions</h3>
+  ${fixtureRows}
+  </body></html>`;
+
+  const win = window.open('', '_blank', 'width=860,height=940');
+  if (win) { win.document.write(printHTML); win.document.close(); win.onload = () => win.print(); }
+  else showToast('⚠️ Allow pop-ups, then retry');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1: PREDICTION ENGINE
+// ═══════════════════════════════════════════════════════════════
+function buildPredictionData(f) {
+  const L = LEAGUES[f.league] || LEAGUES['Low-Tier / Unknown'];
+  const combined = f.combined, trap = f.trapPct, conf = f.conf || 50;
+  const avgTotal = Math.round((f.avgPtsA + f.avgPtsB) / 2);
+  const h2h = f.h2hStats; // v3.2: full H2H stats object
+
+  // v3.2: Blend form average with H2H average for a smarter line
+  let smartAvg = avgTotal;
+  if (h2h && h2h.count >= 2) {
+    // Weight H2H at 40%, recent form at 60% when we have 2-3 H2H games
+    const weight = h2h.count === 3 ? 0.45 : 0.30;
+    smartAvg = Math.round(avgTotal * (1 - weight) + h2h.avgTotal * weight);
+  }
+  const lineRaw = smartAvg + (f.classification==='fast' ? 3 : f.classification==='slow' ? -3 : 0);
+  const line = (lineRaw % 1 === 0) ? lineRaw + 0.5 : lineRaw;
+
+  // v3.2: Data-driven AH line from H2H margin
+  const h2hAHLine = h2h && h2h.count >= 2
+    ? (h2h.avgMargin >= 10 ? (h2h.avgMargin - 1.5) * -1 : h2h.avgMargin >= 6 ? -5.5 : -3.5)
+    : null;
+
+  const predictions = [];
+  const reasons = [];
+
+  if (trap >= 60) {
+    predictions.push({ label:'AVOID', bg:'#374151', color:'#9CA3AF' });
+    reasons.push({ color:'#F59E0B', text:`High trap risk (${trap}%/9 alerts fired). Too many conflicting signals — no prediction issued.` });
+  } else if (combined >= 8 && trap <= 30) {
+    predictions.push({ label:`OVER ${line}`, bg:'#14532D', color:'#6EE7B7' });
+    reasons.push({ color:'#10B981', text:`Strong FAST classification (${combined}/10) with low trap risk (${trap}%). Both teams averaging ${avgTotal} combined pts.` });
+    reasons.push({ color:'#10B981', text:`Combined FGA ${f.combFGA} confirms genuine volume, not just hot shooting.` });
+    if (f.avgFGAA >= L.fHi && f.avgFGAB >= L.fHi) reasons.push({ color:'#10B981', text:`Both teams FGA above league fast threshold (${L.fHi}) — high shot volume expected again.` });
+  } else if (combined >= 7 && combined < 8) {
+    predictions.push({ label:`LEAN OVER ${line}`, bg:'#1A3A28', color:'#6EE7B7' });
+    reasons.push({ color:'#10B981', text:`Near-fast score (${combined}/10). Lean over but confirm with Q1 pace before fully committing.` });
+  } else if (combined >= 5 && combined < 7) {
+    predictions.push({ label:`CONFIRM LIVE`, bg:'#78350F', color:'#FCD34D' });
+    reasons.push({ color:'#F59E0B', text:`Mixed zone (${combined}/10). Wait for Q1 data. If Q1 ≥ ${L.q1F} pts → lean over ${line}. If Q1 < ${L.q1S} pts → lean under ${line}.` });
+  } else if (combined <= 4) {
+    predictions.push({ label:`UNDER ${line}`, bg:'#7F1D1D', color:'#FCA5A5' });
+    reasons.push({ color:'#EF4444', text:`SLOW classification (${combined}/10). Teams average ${avgTotal} combined pts — under ${line} strongly supported.` });
+    if (f.combFGA < 115) reasons.push({ color:'#EF4444', text:`Ultra-low combined FGA (${f.combFGA}) confirms genuine low volume — not just cold shooting.` });
+  }
+
+  // v3.2: H2H-informed Over/Under note
+  if (h2h && h2h.count >= 2) {
+    const h2hLine = h2h.avgTotal + 0.5;
+    if (h2h.trend === 'rising') {
+      reasons.push({ color:'#10B981', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — rising trend (${h2h.totals.join('→')} pts). Supports over.` });
+    } else if (h2h.trend === 'falling') {
+      reasons.push({ color:'#EF4444', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — falling trend (${h2h.totals.join('→')} pts). Supports under.` });
+    } else {
+      reasons.push({ color:'#94A3B8', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — stable pattern (${h2h.totals.join(', ')} pts).` });
+    }
+  }
+
+  // Asian Handicap / Win prediction
+  const nameA = f.teamA, nameB = f.teamB;
+
+  // v3.2: If H2H win record exists, use it to inform win direction
+  if (h2h && h2h.count >= 2 && h2h.dominant !== 'even' && trap <= 40) {
+    const h2hWinner  = h2h.dominant === 'A' ? nameA : nameB;
+    const h2hWins    = h2h.dominant === 'A' ? h2h.aWins : h2h.bWins;
+    const h2hLosses  = h2h.dominant === 'A' ? h2h.bWins : h2h.aWins;
+    const ahUseLine  = h2hAHLine ? h2hAHLine : (h2h.avgMargin >= 8 ? -7.5 : -4.5);
+    // Only push strong H2H win pred if pace score also agrees
+    const paceAgrees = (h2h.dominant === 'A' && f.scoreA >= f.scoreB) ||
+                       (h2h.dominant === 'B' && f.scoreB >= f.scoreA);
+    if (h2hWins >= 2) {
+      if (paceAgrees) {
+        predictions.push({ label:`${h2hWinner} WIN`, bg:'#1E3A5F', color:'#93C5FD' });
+        predictions.push({ label:`${h2hWinner} AH ${ahUseLine}`, bg:'#0C4A6E', color:'#A5F3FC' });
+        reasons.push({ color:'#3B82C4', text:`${h2hWinner} leads H2H ${h2hWins}–${h2hLosses}. Avg winning margin ±${h2h.avgMargin} pts. Pace model agrees — strong win signal.` });
+      } else {
+        predictions.push({ label:`${h2hWinner} AH ${ahUseLine}`, bg:'#0C4A6E', color:'#A5F3FC' });
+        reasons.push({ color:'#F59E0B', text:`${h2hWinner} leads H2H ${h2hWins}–${h2hLosses} but pace model favours opponent. AH only — use smaller stake.` });
+      }
+    }
+  } else if (f.scoreA !== f.scoreB && trap <= 40) {
+    // Fallback to pace-model AH (v3.1 logic) if no H2H data
+    const diff = Math.abs(f.scoreA - f.scoreB);
+    const stronger = f.scoreA > f.scoreB ? nameA : nameB;
+    const ahLine = diff >= 4 ? -7.5 : diff >= 2 ? -5.5 : -3.5;
+    const margin = diff >= 4 ? '8–14' : diff >= 2 ? '5–9' : '3–7';
+    if (diff >= 3) {
+      predictions.push({ label:`${stronger} WIN`, bg:'#1E3A5F', color:'#93C5FD' });
+      predictions.push({ label:`${stronger} AH ${ahLine}`, bg:'#0C4A6E', color:'#A5F3FC' });
+      reasons.push({ color:'#3B82C4', text:`${stronger} has ${diff}-pt rating advantage. No H2H data — based on pace model only. Expected margin ${margin} pts.` });
+    } else if (diff >= 1) {
+      predictions.push({ label:`${stronger} AH ${ahLine}`, bg:'#0C4A6E', color:'#A5F3FC' });
+      reasons.push({ color:'#3B82C4', text:`${stronger} slightly favoured (rating diff: ${diff}). AH ${ahLine} covers marginal edge.` });
+    }
+  }
+
+  // OT note
+  if (f.otRisk) {
+    reasons.push({ color:'#F59E0B', text:`⚠️ OT Risk — teams closely matched. If betting under, allow buffer: overtime adds 20–27 pts.` });
+  }
+
+  // Blowout note
+  if ((f.alerts||[]).find(a => a.label.includes('Blowout') && a.type === 'warn')) {
+    reasons.push({ color:'#EF4444', text:`Blowout pattern in recent games. One team may collapse. Supports under and stronger team covering AH.` });
+  }
+
+  // v3.2: H2H inconsistency note
+  if (h2h && h2h.count >= 2) {
+    const maxT = Math.max(...h2h.totals), minT = Math.min(...h2h.totals);
+    if (maxT - minT >= 20) {
+      reasons.push({ color:'#F59E0B', text:`⚠️ H2H totals vary widely (${minT}–${maxT} pts). These teams produce unpredictable scores — reduce stake size.` });
+    }
+  }
+
+  const stars = conf >= 75 ? '★★★★★' : conf >= 60 ? '★★★★☆' : conf >= 45 ? '★★★☆☆' : conf >= 30 ? '★★☆☆☆' : '★☆☆☆☆';
+  const confColor = conf >= 70 ? '#10B981' : conf >= 50 ? '#F59E0B' : '#EF4444';
+
+  return { predictions, reasons, stars, conf, confColor, line, avgTotal };
+}
+
+function renderPredictions() {
+  const todayISO = new Date().toISOString().split('T')[0];
+  document.getElementById('predDateSub').textContent =
+    new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+
+  const leagueFil = document.getElementById('predLeagueFilter').value;
+  const confFil   = parseInt(document.getElementById('predConfMin').value) || 0;
+
+  // Populate league filter dynamically
+  const allFx = getFixtures();
+  const leagues = ['ALL', ...new Set(allFx.map(f => f.league))];
+  const lfEl = document.getElementById('predLeagueFilter');
+  const curVal = lfEl.value;
+  lfEl.innerHTML = leagues.map(l => `<option value="${l}"${l===curVal?' selected':''}>${l}</option>`).join('');
+
+  // Get today's fixtures (fallback to recent if none today, for testing)
+  let fixtures = allFx.filter(f => f.dateISO === todayISO);
+  if (!fixtures.length) fixtures = allFx.slice(0, 12); // show latest for testing
+
+  // Apply filters
+  if (leagueFil !== 'ALL') fixtures = fixtures.filter(f => f.league === leagueFil);
+  if (confFil > 0)          fixtures = fixtures.filter(f => (f.conf||0) >= confFil);
+
+  const cont  = document.getElementById('predsList');
+  const empty = document.getElementById('predsEmpty');
+
+  if (!fixtures.length) { cont.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  cont.innerHTML = fixtures.map(f => {
+    const P = buildPredictionData(f);
+    const confBarColor = P.conf >= 70 ? '#10B981' : P.conf >= 50 ? '#F59E0B' : '#EF4444';
+
+    const pillsHTML = P.predictions.map(p => `
+      <div class="pred-pill" style="background:${p.bg};color:${p.color};border:1.5px solid ${p.color}40">
+        ${p.label}
+      </div>`).join('');
+
+    const reasonsHTML = P.reasons.map(r => `
+      <div class="pred-reason-item">
+        <div class="reason-dot" style="background:${r.color}"></div>
+        <div>${r.text}</div>
+      </div>`).join('');
+
+    return `
+      <div class="pred-card">
+        <div class="pred-card-hd">
+          <div class="pred-match">${f.teamA} vs ${f.teamB}</div>
+          <div class="pred-league-line">${f.date} · ${f.league} · Avg line: ~${P.avgTotal} pts</div>
+          <div class="pred-pills">${pillsHTML}</div>
+          <div class="pred-conf-row">
+            <span class="pred-stars" style="color:${confBarColor}">${P.stars}</span>
+            <div class="conf-bar-track">
+              <div class="conf-bar-fill" style="width:${P.conf}%;background:${confBarColor}"></div>
+            </div>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:${confBarColor}">${P.conf}%</span>
+          </div>
+        </div>
+        <div class="pred-body">
+          <div class="pred-reasons-title">Why this prediction</div>
+          ${reasonsHTML}
+          <div class="pred-meta-row">
+            <span class="pred-meta-item">Combined: <b>${f.combined}/10</b></span>
+            <span class="pred-meta-item">Trap: <b style="color:${f.trapPct>=50?'var(--yf)':'var(--gf)'}">${f.trapPct}%</b></span>
+            <span class="pred-meta-item">FGA: <b>${f.combFGA||'—'}</b></span>
+            <span class="pred-meta-item">Class: <b>${f.classification.toUpperCase()}</b></span>
+            <span class="pred-meta-item">OT: <b style="color:${f.otRisk?'var(--yf)':'var(--gf)'}">${f.otRisk?'Risk':'Low'}</b></span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // ── Environment detection ────────────────────────────────
+  // Show warning if running as local file (API autofill won't work)
+  const isLocalFile = location.protocol === 'file:';
+  const notice = document.getElementById('claudeEnvNotice');
+  if (isLocalFile && notice) notice.style.display = 'block';
+
+  // ── sendPrompt response listener ─────────────────────────
+  // Claude.ai posts artifact responses back as window messages
+  window.addEventListener('message', (evt) => {
+    // Handle Claude.ai artifact response (sendPrompt reply)
+    if (evt.data?.type === 'claude_response' || evt.data?.role === 'assistant') {
+      const txt = evt.data?.text || evt.data?.content || '';
+      if (txt && window._claudeBridgeResolve) {
+        const stats = parseStatsJson(txt);
+        if (stats) {
+          window._claudeBridgeResolve(stats);
+        } else {
+          // Text came back but no JSON — might still be streaming, wait for more
+          window._claudeBridgeBuffer = (window._claudeBridgeBuffer || '') + txt;
+          const buffered = parseStatsJson(window._claudeBridgeBuffer);
+          if (buffered) window._claudeBridgeResolve(buffered);
+        }
+      }
+    }
+  }, false);
+
+  // Modal overlay close on tap
+  const fxModal = document.getElementById('fxDetailModal');
+  if (fxModal) fxModal.addEventListener('click', function(e) { if (e.target === this) closeFxModal(); });
+
+  loadState();
+  buildInputUI();
+  checkDataCompleteness();
+  updateDot();
+  renderQ1Benchmarks();
+  // Register SW
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+  // Init predictions date
+  const predDateEl = document.getElementById('predDateSub');
+  if (predDateEl) {
+    predDateEl.textContent = new Date().toLocaleDateString('en-GB',
+      {weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+  }
+});
+</script>
+</body>
+</html>
