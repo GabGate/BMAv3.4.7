@@ -2547,47 +2547,94 @@ function markAutofilled() {
 }
 
 // ── Build the prompt ──────────────────────────────────────────
+// ── Prompt 1: scores + dates (easy to find, always works) ────
+function buildScoresPrompt(teamA, teamB, today) {
+  return [
+    'Today is ' + today + '. You are a basketball data assistant.',
+    '',
+    'Search Google/SofaScore/Flashscore for the MOST RECENT completed basketball games.',
+    'Find the 3 LATEST completed games for EACH team (sorted by date, newest first).',
+    'Also find up to 3 head-to-head games where ' + teamA + ' played directly against ' + teamB + '.',
+    '',
+    'TEAM A: ' + teamA,
+    'TEAM B: ' + teamB,
+    '',
+    'For each game record:',
+    '  date: exact date YYYY-MM-DD',
+    '  opponent: who they played against',
+    '  teamScore: this team final score (integer)',
+    '  oppScore: opponent final score (integer)',
+    '',
+    'IMPORTANT: Only include COMPLETED games with a final score. No live, upcoming or cancelled games.',
+    'Sort by date DESCENDING — most recent game first (index 0), oldest game last (index 2).',
+    '',
+    'Return ONLY raw JSON — absolutely no markdown fences, no text before or after:',
+    '{"gamesA":[',
+    '  {"date":"2026-05-20","opponent":"Team X","teamScore":85,"oppScore":73},',
+    '  {"date":"2026-05-17","opponent":"Team Y","teamScore":91,"oppScore":80},',
+    '  {"date":"2026-05-14","opponent":"Team Z","teamScore":78,"oppScore":82}',
+    '],"gamesB":[',
+    '  {"date":"2026-05-21","opponent":"Team W","teamScore":88,"oppScore":76},',
+    '  {"date":"2026-05-18","opponent":"Team V","teamScore":95,"oppScore":89},',
+    '  {"date":"2026-05-15","opponent":"Team U","teamScore":82,"oppScore":85}',
+    '],"h2hGames":[',
+    '  {"date":"2026-01-15","teamAScore":108,"teamBScore":102},',
+    '  {"date":"2025-11-20","teamAScore":95,"teamBScore":112},',
+    '  {"date":"2025-04-10","teamAScore":90,"teamBScore":88}',
+    '],"sources":["SofaScore"]}'
+  ].join('\n');
+}
+
+// ── Prompt 2: statistics tab data for one specific game ───────
+// SofaScore Statistics tab layout (as seen on screenshot):
+//   Left team | Stat name | Right team
+//   13/21  62%  Free throws  95%  20/21
+//   25/44  57%  2 pointers   44%  18/41
+//    7/26  27%  3 pointers   26%   6/23
+//   32/70  46%  Field goals  38%  24/64   <-- FGA = denominator (70 and 64)
+//   15          Assists      14           <-- assistsAllowed for each side
+// defFgPct for team A = RIGHT team Field goals % (38% = 0.38 above)
+// defFgPct for team B = LEFT team Field goals % (46% = 0.46 above)
+function buildStatsPrompt(teamA, teamB, teamAOpponent, teamBOpponent, dateA, dateB, today) {
+  var lines = [
+    'Today is ' + today + '. Basketball statistics lookup.',
+    '',
+    'I need the STATISTICS TAB data from SofaScore for TWO specific games.',
+    'The Statistics tab on SofaScore shows shooting splits like this:',
+    '  Left%  Free throws  Right%',
+    '  Left%  2 pointers   Right%',
+    '  Left%  3 pointers   Right%',
+    '  LeftFGM/LeftFGA  Left%  Field goals  Right%  RightFGM/RightFGA',
+    '  LeftNum  Assists  RightNum',
+    '',
+    '--- GAME 1 ---',
+    teamA + ' vs ' + teamAOpponent + ' on ' + dateA,
+    'Search: site:sofascore.com "' + teamA + '" "' + teamAOpponent + '" statistics',
+    'From the Statistics tab, extract for ' + teamA + ':',
+    '  fga_A: the DENOMINATOR of ' + teamA + "'s Field goals fraction (e.g. 32/70 → fga=70)",
+    '  tpa_A: the DENOMINATOR of ' + teamA + "'s 3 pointers fraction (e.g. 7/26 → tpa=26)",
+    '  defFgPct_A: the Field goals PERCENTAGE of ' + teamAOpponent + ' (the opponent) as decimal (e.g. 38% → 0.38)',
+    '  assistsAllowed_A: the Assists number for ' + teamAOpponent + ' (opponent assists)',
+    '',
+    '--- GAME 2 ---',
+    teamB + ' vs ' + teamBOpponent + ' on ' + dateB,
+    'Search: site:sofascore.com "' + teamB + '" "' + teamBOpponent + '" statistics',
+    'From the Statistics tab, extract for ' + teamB + ':',
+    '  fga_B: the DENOMINATOR of ' + teamB + "'s Field goals fraction",
+    '  tpa_B: the DENOMINATOR of ' + teamB + "'s 3 pointers fraction",
+    '  defFgPct_B: the Field goals PERCENTAGE of ' + teamBOpponent + ' (the opponent) as decimal',
+    '  assistsAllowed_B: the Assists number for ' + teamBOpponent,
+    '',
+    'Return ONLY raw JSON — no markdown, no text outside the braces:',
+    '{"gameA":{"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},',
+    ' "gameB":{"fga":74,"tpa":24,"defFgPct":0.44,"assistsAllowed":19}}'
+  ];
+  return lines.join('\n');
+}
+
+// ── Legacy single-prompt fallback ─────────────────────────────
 function buildGeminiPrompt(teamA, teamB, today) {
-  var p = '';
-  p += 'Basketball stats research. Today: ' + today + '.\n';
-  p += 'Teams: A=' + teamA + '  B=' + teamB + '\n\n';
-
-  p += 'TASK 1 — Last 3 completed games for ' + teamA + ':\n';
-  p += 'Search SofaScore or Flashscore for "' + teamA + ' basketball results". ';
-  p += 'For each game open the BOX SCORE. Record:\n';
-  p += '  teamScore = ' + teamA + ' final score\n';
-  p += '  oppScore = opponent final score\n';
-  p += '  fga = ' + teamA + ' field goal attempts (from ' + teamA + ' box score row)\n';
-  p += '  tpa = ' + teamA + ' 3-point attempts\n';
-  p += '  defFgPct = OPPONENT field goal % in that game (opponent FGM/FGA, decimal e.g. 0.452)\n';
-  p += '  assistsAllowed = OPPONENT total assists in that game\n\n';
-
-  p += 'TASK 2 — Last 3 completed games for ' + teamB + ' (same method).\n\n';
-
-  p += 'TASK 3 — Head-to-head: search "' + teamA + ' vs ' + teamB + ' basketball history". ';
-  p += 'Find the 3 most recent direct matchups. If only 2 exist return 2, if only 1 exists return 1. ';
-  p += 'For h2hGames: a = ' + teamA + ' score, b = ' + teamB + ' score, date = YYYY-MM-DD.\n\n';
-
-  p += 'OUTPUT: return ONLY a raw JSON object — no markdown fences, no text outside the JSON.\n';
-  p += 'All arrays must have exactly 3 items (use nulls for unavailable values).\n';
-  p += 'Example structure:\n';
-  p += '{"teamA":"' + teamA + '","teamB":"' + teamB + '",';
-  p += '"gamesA":[';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":85,"oppScore":73,"fga":72,"tpa":22,"defFgPct":0.441,"assistsAllowed":18},';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":91,"oppScore":80,"fga":75,"tpa":25,"defFgPct":0.458,"assistsAllowed":21},';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":78,"oppScore":82,"fga":70,"tpa":20,"defFgPct":0.471,"assistsAllowed":23}';
-  p += '],';
-  p += '"gamesB":[';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":88,"oppScore":76,"fga":74,"tpa":24,"defFgPct":0.445,"assistsAllowed":19},';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":95,"oppScore":89,"fga":78,"tpa":27,"defFgPct":0.462,"assistsAllowed":22},';
-  p += '{"gameLabel":"vs Opp (YYYY-MM-DD)","teamScore":82,"oppScore":85,"fga":71,"tpa":21,"defFgPct":0.453,"assistsAllowed":20}';
-  p += '],';
-  p += '"h2hGames":[';
-  p += '{"a":85,"b":80,"date":"2026-01-15"},';
-  p += '{"a":78,"b":82,"date":"2025-11-20"},';
-  p += '{"a":90,"b":88,"date":"2025-04-10"}';
-  p += '],"dataQuality":"full","sources":["SofaScore"]}';
-  return p;
+  return buildScoresPrompt(teamA, teamB, today);
 }
 
 // ── Parse JSON from response ──────────────────────────────────
@@ -2757,139 +2804,268 @@ function applyStats(stats, teamA, teamB) {
 }
 
 // ── MAIN: Gemini Autofill ─────────────────────────────────────
+// ── Shared: call Gemini with a prompt, return parsed JSON ─────
+async function callGemini(key, prompt, statusMsg) {
+  const MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+  ];
+  showFetchStatus('loading', statusMsg, [], []);
+
+  async function tryModel(model) {
+    var body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+    };
+    var res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    var data = await res.json();
+    if (!res.ok) {
+      var msg = (data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
+      var isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+      var isNotFound = res.status === 404 || msg.toLowerCase().includes('not found');
+      throw Object.assign(new Error(msg), { isQuota: isQuota, isNotFound: isNotFound });
+    }
+    return { data: data, model: model };
+  }
+
+  var result = null, lastErr = null;
+  for (var mi = 0; mi < MODELS.length; mi++) {
+    try {
+      result = await tryModel(MODELS[mi]);
+      break;
+    } catch(e) {
+      lastErr = e;
+      console.warn('Model ' + MODELS[mi] + ' failed:', e.message);
+      if (e.isQuota || e.isNotFound) continue;
+      break;
+    }
+  }
+  if (!result) throw lastErr || new Error('All models failed.');
+
+  // Extract + deduplicate text parts
+  var rawParts = (result.data.candidates || [])
+    .reduce(function(acc, c) { return acc.concat((c.content && c.content.parts) ? c.content.parts : []); }, [])
+    .filter(function(p) { return p.text && p.text.trim().length > 10; })
+    .map(function(p) { return p.text.trim(); });
+
+  var seen = {}, unique = [];
+  rawParts.forEach(function(t) {
+    var k = t.slice(0, 80);
+    if (!seen[k]) { seen[k] = true; unique.push(t); }
+  });
+  var text = unique.join('\n');
+  if (!text) throw new Error(result.model + ' returned empty response.');
+  return { text: text, model: result.model };
+}
+
 async function geminiAutofill() {
-  const teamA = (document.getElementById('claudeTeamA')?.value || '').trim();
-  const teamB = (document.getElementById('claudeTeamB')?.value || '').trim();
+  var teamA = (document.getElementById('claudeTeamA') ? document.getElementById('claudeTeamA').value : '').trim();
+  var teamB = (document.getElementById('claudeTeamB') ? document.getElementById('claudeTeamB').value : '').trim();
 
-  if (!teamA || !teamB) {
-    showFetchStatus('failed', 'Enter both team names above first.', [], []);
-    return;
-  }
+  if (!teamA || !teamB) { showFetchStatus('failed', 'Enter both team names above first.', [], []); return; }
 
-  const key = getGeminiKey();
+  var key = getGeminiKey();
   if (!key) {
-    showFetchStatus('failed',
-      'No Gemini API key saved. Go to Settings to add your free key from aistudio.google.com',
-      [], []);
+    showFetchStatus('failed', 'No Gemini API key saved. Go to Settings to add your free key from aistudio.google.com', [], []);
     return;
   }
 
-  const btn = document.getElementById('geminiAutofillBtn');
-  const sp  = document.getElementById('geminiSpinner');
+  var btn = document.getElementById('geminiAutofillBtn');
+  var sp  = document.getElementById('geminiSpinner');
   if (btn) btn.disabled = true;
   if (sp)  sp.style.display = 'inline-block';
 
-  // Set team names immediately
-  state.teamAName = teamA;
-  state.teamBName = teamB;
-  const tAEl = document.getElementById('teamAName');
-  const tBEl = document.getElementById('teamBName');
+  state.teamAName = teamA; state.teamBName = teamB;
+  var tAEl = document.getElementById('teamAName'), tBEl = document.getElementById('teamBName');
   if (tAEl) tAEl.value = teamA;
   if (tBEl) tBEl.value = teamB;
 
-  const today = new Date().toISOString().split('T')[0];
-  showFetchStatus('loading', `Gemini is searching for ${teamA} vs ${teamB} stats…`, [], []);
+  var today = new Date().toISOString().split('T')[0];
 
   try {
-    const prompt = buildGeminiPrompt(teamA, teamB, today);
+    // ── CALL 1: Scores + dates (fast, always works) ───────────
+    var r1 = await callGemini(key, buildScoresPrompt(teamA, teamB, today),
+      'Step 1/2 — searching recent results for ' + teamA + ' & ' + teamB + '...');
 
-    // Model fallback chain — current free-tier models as of May 2026
-    // gemini-2.5-flash-lite: 15 RPM, 1000 RPD free
-    // gemini-2.5-flash:      10 RPM,  500 RPD free  
-    // gemini-2.0-flash:      retiring 2026-06-01, skip unless others fail
-    // Current working free-tier models (May 2026) — no preview/sunset IDs
-    const MODELS = [
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-    ];
-
-    async function tryModel(model) {
-      const body = {
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-      };
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = (data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
-        const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
-        const isNotFound = res.status === 404 || msg.toLowerCase().includes('not found');
-        throw Object.assign(new Error(msg), { isQuota, isNotFound, model });
-      }
-      return data;
+    var scores = parseStatsJson(r1.text);
+    if (!scores || (!scores.gamesA && !scores.gamesB)) {
+      console.error('Scores response:', r1.text);
+      throw new Error('Could not parse scores. Raw logged to console.');
     }
 
-    let data = null;
-    let usedModel = '';
-    let lastErr = null;
-
-    for (const model of MODELS) {
-      try {
-        showFetchStatus('loading', 'Searching with ' + model + '\u2026', [], []);
-        data = await tryModel(model);
-        usedModel = model;
-        break;
-      } catch(e) {
-        lastErr = e;
-        console.warn('Model ' + model + ' failed:', e.message);
-        if (e.isQuota || e.isNotFound) continue; // try next model
-        break; // hard error (bad key, network) — stop
-      }
+    // Sort each array by date descending, keep top 3
+    function topThree(arr) {
+      if (!arr || !arr.length) return [];
+      return arr.slice().sort(function(a, b) {
+        if (!a.date) return 1; if (!b.date) return -1;
+        return b.date.localeCompare(a.date);
+      }).slice(0, 3);
     }
+    var gA = topThree(scores.gamesA || []);
+    var gB = topThree(scores.gamesB || []);
 
-    if (!data) throw lastErr || new Error('All models failed. Check your API key or wait 1 min and retry.');
-
-    // Extract text — Gemini search grounding can duplicate blocks or split content.
-    // Collect all non-empty text parts, deduplicate by 80-char prefix, join.
-    var rawParts = (data.candidates || [])
-      .reduce(function(acc, c) {
-        var parts = (c.content && c.content.parts) ? c.content.parts : [];
-        return acc.concat(parts);
-      }, [])
-      .filter(function(p) { return p.text && p.text.trim().length > 10; })
-      .map(function(p) { return p.text.trim(); });
-
-    var seen = {};
-    var uniqueParts = rawParts.filter(function(t) {
-      var key = t.slice(0, 80);
-      if (seen[key]) return false;
-      seen[key] = true;
-      return true;
+    // Fill scores into state immediately
+    gA.forEach(function(g, i) {
+      if (g.teamScore != null) state.gamesA[i].ts = Math.round(+g.teamScore);
+      if (g.oppScore  != null) state.gamesA[i].os = Math.round(+g.oppScore);
+    });
+    gB.forEach(function(g, i) {
+      if (g.teamScore != null) state.gamesB[i].ts = Math.round(+g.teamScore);
+      if (g.oppScore  != null) state.gamesB[i].os = Math.round(+g.oppScore);
     });
 
-    var text = uniqueParts.join('\n');
-    if (!text) throw new Error(usedModel + ' returned empty response. Try again.');
-
-    var stats = parseStatsJson(text);
-    if (!stats) {
-      console.error('=== RAW GEMINI RESPONSE ===');
-      console.error(text);
-      var hasJson = text.indexOf('"gamesA"') !== -1 || text.indexOf('"gamesB"') !== -1;
-      var hint = hasJson
-        ? 'JSON found but incomplete (truncated). Retry — if it keeps failing, the model is having trouble with this matchup.'
-        : 'Model returned plain text, not JSON. Retry once.';
-      throw new Error(usedModel + ': ' + hint);
+    // H2H
+    state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}];
+    if (scores.h2hGames && scores.h2hGames.length) {
+      var h2h = scores.h2hGames.slice().sort(function(a,b){
+        if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
+      });
+      h2h.slice(0,3).forEach(function(g,i){
+        if (g.teamAScore != null) state.h2hGames[i].a = Math.round(+g.teamAScore);
+        if (g.teamBScore != null) state.h2hGames[i].b = Math.round(+g.teamBScore);
+      });
     }
 
-    if (stats.sources) stats.sources.unshift(usedModel);
-    else stats.sources = [usedModel];
+    buildInputUI(); buildH2HUI(); saveState();
+    showFetchStatus('loading', 'Step 2/2 — fetching shooting & defensive stats from SofaScore...', [], []);
 
-    applyStats(stats, teamA, teamB);
+    // ── CALL 2: Statistics tab data (FGA, 3PA, defFgPct, assists) ──
+    // Build one prompt covering all 6 games (3 per team)
+    var statsLines = [
+      'Today is ' + today + '. Basketball statistics lookup from SofaScore.',
+      '',
+      'I need the STATISTICS TAB data for these specific games.',
+      'On SofaScore the Statistics tab shows shooting splits. The layout is:',
+      '  LeftFGM/LeftFGA  Left%  "Field goals"  Right%  RightFGM/RightFGA',
+      '  LeftNum  "3 pointers"  ... (3-point attempts = denominator of the fraction)',
+      '  LeftNum  "Assists"  RightNum',
+      '',
+      'For each game I need (from the perspective of the HOME/LEFT team):'
+    ];
+
+    // Add each teamA game
+    gA.forEach(function(g, i) {
+      var opp = g.opponent || 'opponent';
+      var label = teamA + ' vs ' + opp + ' (' + (g.date || 'recent') + ')';
+      statsLines.push('');
+      statsLines.push('GAME A' + (i+1) + ': ' + label);
+      statsLines.push('Search: ' + teamA + ' ' + opp + ' ' + (g.date || '') + ' basketball sofascore statistics');
+      statsLines.push('Extract for ' + teamA + ':');
+      statsLines.push('  fga: ' + teamA + ' field goal ATTEMPTS (denominator of their Field goals fraction, e.g. 32/70 → 70)');
+      statsLines.push('  tpa: ' + teamA + ' 3-point ATTEMPTS (denominator of their 3 pointers fraction, e.g. 7/26 → 26)');
+      statsLines.push('  defFgPct: ' + opp + ' Field goals % as decimal (e.g. 38% → 0.38). This is what the OPPONENT shot.');
+      statsLines.push('  assistsAllowed: ' + opp + ' Assists number (how many assists the opponent had)');
+    });
+
+    // Add each teamB game
+    gB.forEach(function(g, i) {
+      var opp = g.opponent || 'opponent';
+      var label = teamB + ' vs ' + opp + ' (' + (g.date || 'recent') + ')';
+      statsLines.push('');
+      statsLines.push('GAME B' + (i+1) + ': ' + label);
+      statsLines.push('Search: ' + teamB + ' ' + opp + ' ' + (g.date || '') + ' basketball sofascore statistics');
+      statsLines.push('Extract for ' + teamB + ':');
+      statsLines.push('  fga: ' + teamB + ' field goal ATTEMPTS (denominator)');
+      statsLines.push('  tpa: ' + teamB + ' 3-point ATTEMPTS (denominator)');
+      statsLines.push('  defFgPct: ' + opp + ' Field goals % as decimal');
+      statsLines.push('  assistsAllowed: ' + opp + ' Assists number');
+    });
+
+    statsLines.push('');
+    statsLines.push('Return ONLY raw JSON, no markdown, no text outside the braces:');
+    statsLines.push('{');
+    statsLines.push('  "gamesA":[');
+    statsLines.push('    {"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},');
+    statsLines.push('    {"fga":75,"tpa":28,"defFgPct":0.44,"assistsAllowed":19},');
+    statsLines.push('    {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
+    statsLines.push('  ],');
+    statsLines.push('  "gamesB":[');
+    statsLines.push('    {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":21},');
+    statsLines.push('    {"fga":78,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
+    statsLines.push('    {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":22}');
+    statsLines.push('  ],');
+    statsLines.push('  "sources":["SofaScore"]');
+    statsLines.push('}');
+    statsLines.push('Use null for any value you cannot find after searching.');
+
+    var r2 = await callGemini(key, statsLines.join('\n'),
+      'Step 2/2 — fetching shooting & defensive stats...');
+
+    var boxStats = parseStatsJson(r2.text);
+    console.log('Box stats response:', r2.text);
+
+    // Apply box stats (FGA, 3PA, defFgPct, assistsAllowed)
+    function applyBoxStats(arr, stateGames, stateDef) {
+      if (!arr || !arr.length) return;
+      arr.slice(0,3).forEach(function(g, i) {
+        if (g.fga            != null && +g.fga > 0)  stateGames[i].fga  = Math.round(+g.fga);
+        if (g.tpa            != null && +g.tpa > 0)  stateGames[i].tpa  = Math.round(+g.tpa);
+        if (g.defFgPct       != null && +g.defFgPct > 0) stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(3));
+        if (g.assistsAllowed != null && +g.assistsAllowed > 0) stateDef[i].ast = Math.round(+g.assistsAllowed);
+      });
+    }
+
+    if (boxStats && boxStats.gamesA) applyBoxStats(boxStats.gamesA, state.gamesA, state.defA);
+    if (boxStats && boxStats.gamesB) applyBoxStats(boxStats.gamesB, state.gamesB, state.defB);
+
+    // Estimate any still-missing defensive stats from oppScore
+    function estimateMissing(stateGames, stateDef) {
+      stateGames.forEach(function(g, i) {
+        var os = g.os || 0;
+        if (os > 0) {
+          if (!stateDef[i].fgPct || stateDef[i].fgPct === 0) {
+            stateDef[i].fgPct = parseFloat(Math.min(0.54, Math.max(0.38, (os - 10) / (os * 2.15))).toFixed(3));
+          }
+          if (!stateDef[i].ast || stateDef[i].ast === 0) {
+            stateDef[i].ast = Math.round(Math.min(32, Math.max(14, os / 5.1)));
+          }
+        }
+      });
+    }
+    estimateMissing(state.gamesA, state.defA);
+    estimateMissing(state.gamesB, state.defB);
+
+    // Build status report
+    var filled = [], warnings = [];
+    filled.push(teamA + ': ' + gA.length + ' games');
+    filled.push(teamB + ': ' + gB.length + ' games');
+    var h2hCount = state.h2hGames.filter(function(g){ return g.a !== null; }).length;
+    if (h2hCount > 0) filled.push('H2H: ' + h2hCount + ' result(s)');
+    else warnings.push('No H2H history found');
+
+    var defAReal = boxStats && boxStats.gamesA ? boxStats.gamesA.filter(function(g){ return g && g.defFgPct != null; }).length : 0;
+    var defBReal = boxStats && boxStats.gamesB ? boxStats.gamesB.filter(function(g){ return g && g.defFgPct != null; }).length : 0;
+    if (defAReal > 0) filled.push(teamA + ' def: ' + defAReal + '/3 from SofaScore');
+    else warnings.push(teamA + ' def stats estimated from score — verify on SofaScore');
+    if (defBReal > 0) filled.push(teamB + ' def: ' + defBReal + '/3 from SofaScore');
+    else warnings.push(teamB + ' def stats estimated from score — verify on SofaScore');
+
+    var sources = [r1.model];
+    if (scores.sources) sources = sources.concat(scores.sources);
+    filled.push('Sources: ' + sources.join(', '));
+
+    buildInputUI(); buildH2HUI(); checkDataCompleteness(); saveState(); markAutofilled();
+
+    var q = warnings.length === 0 ? 'success' : 'partial';
+    showFetchStatus(q,
+      q === 'success'
+        ? '\u2713 ' + teamA + ' vs ' + teamB + ' fully filled! Select League Preset below.'
+        : '\u29d6 ' + teamA + ' vs ' + teamB + ' filled. Some stats estimated — check warnings.',
+      filled, warnings);
 
   } catch(e) {
-    const isQuota = e.message?.toLowerCase().includes('quota') || e.isQuota;
+    var isQuota = e.isQuota || (e.message && e.message.toLowerCase().includes('quota'));
     showFetchStatus('failed',
       isQuota
-        ? 'All free-tier models are quota-limited. Wait ~1 min and retry, or go to aistudio.google.com to enable billing (still very cheap). You can also try a different API key.'
-        : 'Gemini error: ' + e.message,
-      [], []
-    );
+        ? 'Quota exceeded. Wait ~1 min and retry, or enable billing at aistudio.google.com.'
+        : 'Error: ' + e.message,
+      [], []);
     console.error('Gemini autofill error:', e);
   } finally {
     if (btn) btn.disabled = false;
