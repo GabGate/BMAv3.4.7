@@ -2550,37 +2550,43 @@ function markAutofilled() {
 // ── Prompt 1: scores + dates (easy to find, always works) ────
 function buildScoresPrompt(teamA, teamB, today) {
   return [
-    'Today is ' + today + '. You are a basketball data assistant.',
+    'You are a basketball stats assistant. Today is ' + today + '.',
     '',
-    'Search Google/SofaScore/Flashscore for the MOST RECENT completed basketball games.',
-    'Find the 3 LATEST completed games for EACH team (sorted by date, newest first).',
-    'Also find up to 3 head-to-head games where ' + teamA + ' played directly against ' + teamB + '.',
+    'STEP 1: Search Google for: ' + teamA + ' basketball results ' + today.slice(0,7),
+    'Go to SofaScore or Flashscore results/fixtures page for ' + teamA + '.',
+    'List ALL completed games (FT = Full Time) ordered by date, most recent first.',
+    'Pick the TOP 3 completed games with a final score BEFORE today ' + today + '.',
+    'IGNORE any game that is upcoming, live, or cancelled.',
     '',
-    'TEAM A: ' + teamA,
-    'TEAM B: ' + teamB,
+    'STEP 2: Search Google for: ' + teamB + ' basketball results ' + today.slice(0,7),
+    'Same process — pick the 3 most recent completed games for ' + teamB + '.',
     '',
-    'For each game record:',
-    '  date: exact date YYYY-MM-DD',
-    '  opponent: who they played against',
-    '  teamScore: this team final score (integer)',
-    '  oppScore: opponent final score (integer)',
+    'STEP 3: Search Google for: ' + teamA + ' vs ' + teamB + ' basketball h2h history',
+    'Find direct meetings between these two teams. List up to 3 most recent completed H2H games.',
+    'Skip cancelled games.',
     '',
-    'IMPORTANT: Only include COMPLETED games with a final score. No live, upcoming or cancelled games.',
-    'Sort by date DESCENDING — most recent game first (index 0), oldest game last (index 2).',
+    'CRITICAL RULES:',
+    '- Every game MUST have a real final score (two numbers, e.g. 84-74)',
+    '- Date format: YYYY-MM-DD',
+    '- opponent: the other team name',
+    '- teamScore: ' + teamA + ' or ' + teamB + ' score',
+    '- oppScore: the opponent score in that game',
+    '- For h2hGames: teamAScore = ' + teamA + ' score, teamBScore = ' + teamB + ' score',
+    '- Sort each array newest-first (index 0 = most recent)',
     '',
-    'Return ONLY raw JSON — absolutely no markdown fences, no text before or after:',
+    'Return ONLY raw JSON. No markdown. No explanation. Start with { end with }:',
     '{"gamesA":[',
-    '  {"date":"2026-05-20","opponent":"Team X","teamScore":85,"oppScore":73},',
-    '  {"date":"2026-05-17","opponent":"Team Y","teamScore":91,"oppScore":80},',
-    '  {"date":"2026-05-14","opponent":"Team Z","teamScore":78,"oppScore":82}',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":84,"oppScore":74},',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":91,"oppScore":80},',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":78,"oppScore":82}',
     '],"gamesB":[',
-    '  {"date":"2026-05-21","opponent":"Team W","teamScore":88,"oppScore":76},',
-    '  {"date":"2026-05-18","opponent":"Team V","teamScore":95,"oppScore":89},',
-    '  {"date":"2026-05-15","opponent":"Team U","teamScore":82,"oppScore":85}',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":88,"oppScore":76},',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":95,"oppScore":89},',
+    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":82,"oppScore":85}',
     '],"h2hGames":[',
-    '  {"date":"2026-01-15","teamAScore":108,"teamBScore":102},',
-    '  {"date":"2025-11-20","teamAScore":95,"teamBScore":112},',
-    '  {"date":"2025-04-10","teamAScore":90,"teamBScore":88}',
+    '  {"date":"YYYY-MM-DD","teamAScore":85,"teamBScore":80},',
+    '  {"date":"YYYY-MM-DD","teamAScore":78,"teamBScore":82},',
+    '  {"date":"YYYY-MM-DD","teamAScore":90,"teamBScore":88}',
     '],"sources":["SofaScore"]}'
   ].join('\n');
 }
@@ -2715,7 +2721,7 @@ function applyStats(stats, teamA, teamB) {
     if (oppScore == null || oppScore <= 0) return { fgPct: null, ast: null };
     // FG% estimate: points allowed correlates ~0.45 center; adjust by score
     var fgPct = Math.min(0.54, Math.max(0.38, (oppScore - 10) / (oppScore * 2.15)));
-    fgPct = parseFloat(fgPct.toFixed(3));
+    fgPct = parseFloat(fgPct.toFixed(2));
     // Assists: roughly 1 assist per 5 pts scored
     var ast = Math.round(Math.min(32, Math.max(14, oppScore / 5.1)));
     return { fgPct: fgPct, ast: ast };
@@ -2736,7 +2742,7 @@ function applyStats(stats, teamA, teamB) {
       if (g.tpa            != null) stateGames[i].tpa = Math.round(+g.tpa);
 
       if (g.defFgPct != null && +g.defFgPct > 0) {
-        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(3));
+        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2));
         defFoundCount++;
       } else {
         // Estimate from oppScore
@@ -2935,64 +2941,66 @@ async function geminiAutofill() {
     buildInputUI(); buildH2HUI(); saveState();
     showFetchStatus('loading', 'Step 2/2 — fetching shooting & defensive stats from SofaScore...', [], []);
 
-    // ── CALL 2: Statistics tab data (FGA, 3PA, defFgPct, assists) ──
-    // Build one prompt covering all 6 games (3 per team)
+    // ── CALL 2: Statistics tab (FGA, 3PA, defFgPct, assists) ────
+    // Build a single focused prompt for all 6 games
     var statsLines = [
-      'Today is ' + today + '. Basketball statistics lookup from SofaScore.',
+      'You are a basketball stats extractor. Today is ' + today + '.',
       '',
-      'I need the STATISTICS TAB data for these specific games.',
-      'On SofaScore the Statistics tab shows shooting splits. The layout is:',
-      '  LeftFGM/LeftFGA  Left%  "Field goals"  Right%  RightFGM/RightFGA',
-      '  LeftNum  "3 pointers"  ... (3-point attempts = denominator of the fraction)',
-      '  LeftNum  "Assists"  RightNum',
+      'I need shooting stats from the STATISTICS TAB on SofaScore for specific games.',
       '',
-      'For each game I need (from the perspective of the HOME/LEFT team):'
+      'HOW TO READ THE SOFASCORE STATISTICS TAB:',
+      'The Statistics tab shows two columns (home team LEFT, away team RIGHT) with rows like:',
+      '  "13/21  62%   Free throws   95%  20/21"   → FTM/FTA for each side',
+      '  "25/44  57%   2 pointers    44%  18/41"   → 2PM/2PA for each side',
+      '  " 7/26  27%   3 pointers    26%   6/23"   → 3PM/3PA. FGA = 26 (left) or 23 (right)',
+      '  "32/70  46%   Field goals   38%  24/64"   → FGM/FGA. FGA = 70 (left) or 64 (right). FG% = 46% (left) or 38% (right)',
+      '  "15         Assists        14"            → Assists = 15 (left team) 14 (right team)',
+      '',
+      'KEY RULES:',
+      '  - fga = the DENOMINATOR of the Field goals fraction for THIS team (not the opponent)',
+      '  - tpa = the DENOMINATOR of the 3 pointers fraction for THIS team',
+      '  - defFgPct = the Field goals PERCENTAGE of the OPPONENT (the other team FG%) as decimal',
+      '             e.g. if THIS team FG% = 46% and OPPONENT FG% = 38%, then defFgPct = 0.38',
+      '  - assistsAllowed = the Assists number belonging to the OPPONENT',
+      '  - Always identify which side (left or right) is THIS team first, then read the other side for def stats',
+      ''
     ];
 
     // Add each teamA game
     gA.forEach(function(g, i) {
-      var opp = g.opponent || 'opponent';
-      var label = teamA + ' vs ' + opp + ' (' + (g.date || 'recent') + ')';
+      var opp = g.opponent || 'unknown opponent';
+      var score = g.teamScore + '-' + g.oppScore;
+      statsLines.push('GAME A' + (i+1) + ': ' + teamA + ' vs ' + opp + ' final score ' + score + ' on ' + (g.date || 'recent'));
+      statsLines.push('Search: sofascore ' + teamA + ' ' + opp + ' ' + (g.date||'').replace(/-/g,' ') + ' statistics');
+      statsLines.push('From the Statistics tab, extract for ' + teamA + ':');
+      statsLines.push('  fga (Field goals denominator for ' + teamA + '), tpa (3 pointers denominator for ' + teamA + '),');
+      statsLines.push('  defFgPct (' + opp + ' Field goals % as decimal), assistsAllowed (' + opp + ' Assists number)');
       statsLines.push('');
-      statsLines.push('GAME A' + (i+1) + ': ' + label);
-      statsLines.push('Search: ' + teamA + ' ' + opp + ' ' + (g.date || '') + ' basketball sofascore statistics');
-      statsLines.push('Extract for ' + teamA + ':');
-      statsLines.push('  fga: ' + teamA + ' field goal ATTEMPTS (denominator of their Field goals fraction, e.g. 32/70 → 70)');
-      statsLines.push('  tpa: ' + teamA + ' 3-point ATTEMPTS (denominator of their 3 pointers fraction, e.g. 7/26 → 26)');
-      statsLines.push('  defFgPct: ' + opp + ' Field goals % as decimal (e.g. 38% → 0.38). This is what the OPPONENT shot.');
-      statsLines.push('  assistsAllowed: ' + opp + ' Assists number (how many assists the opponent had)');
     });
 
     // Add each teamB game
     gB.forEach(function(g, i) {
-      var opp = g.opponent || 'opponent';
-      var label = teamB + ' vs ' + opp + ' (' + (g.date || 'recent') + ')';
+      var opp = g.opponent || 'unknown opponent';
+      var score = g.teamScore + '-' + g.oppScore;
+      statsLines.push('GAME B' + (i+1) + ': ' + teamB + ' vs ' + opp + ' final score ' + score + ' on ' + (g.date || 'recent'));
+      statsLines.push('Search: sofascore ' + teamB + ' ' + opp + ' ' + (g.date||'').replace(/-/g,' ') + ' statistics');
+      statsLines.push('From the Statistics tab, extract for ' + teamB + ':');
+      statsLines.push('  fga (Field goals denominator for ' + teamB + '), tpa (3 pointers denominator for ' + teamB + '),');
+      statsLines.push('  defFgPct (' + opp + ' Field goals % as decimal), assistsAllowed (' + opp + ' Assists number)');
       statsLines.push('');
-      statsLines.push('GAME B' + (i+1) + ': ' + label);
-      statsLines.push('Search: ' + teamB + ' ' + opp + ' ' + (g.date || '') + ' basketball sofascore statistics');
-      statsLines.push('Extract for ' + teamB + ':');
-      statsLines.push('  fga: ' + teamB + ' field goal ATTEMPTS (denominator)');
-      statsLines.push('  tpa: ' + teamB + ' 3-point ATTEMPTS (denominator)');
-      statsLines.push('  defFgPct: ' + opp + ' Field goals % as decimal');
-      statsLines.push('  assistsAllowed: ' + opp + ' Assists number');
     });
 
-    statsLines.push('');
-    statsLines.push('Return ONLY raw JSON, no markdown, no text outside the braces:');
-    statsLines.push('{');
-    statsLines.push('  "gamesA":[');
-    statsLines.push('    {"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},');
-    statsLines.push('    {"fga":75,"tpa":28,"defFgPct":0.44,"assistsAllowed":19},');
-    statsLines.push('    {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
-    statsLines.push('  ],');
-    statsLines.push('  "gamesB":[');
-    statsLines.push('    {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":21},');
-    statsLines.push('    {"fga":78,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
-    statsLines.push('    {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":22}');
-    statsLines.push('  ],');
-    statsLines.push('  "sources":["SofaScore"]');
-    statsLines.push('}');
-    statsLines.push('Use null for any value you cannot find after searching.');
+    statsLines.push('Return ONLY raw JSON — no markdown, no explanation, start with { end with }:');
+    statsLines.push('{"gamesA":[');
+    statsLines.push('  {"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},');
+    statsLines.push('  {"fga":75,"tpa":28,"defFgPct":0.44,"assistsAllowed":19},');
+    statsLines.push('  {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
+    statsLines.push('],"gamesB":[');
+    statsLines.push('  {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":21},');
+    statsLines.push('  {"fga":78,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
+    statsLines.push('  {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":22}');
+    statsLines.push('],"sources":["SofaScore"]}');
+    statsLines.push('Use null for any value you cannot confirm. Do not guess or estimate.');
 
     var r2 = await callGemini(key, statsLines.join('\n'),
       'Step 2/2 — fetching shooting & defensive stats...');
@@ -3006,7 +3014,7 @@ async function geminiAutofill() {
       arr.slice(0,3).forEach(function(g, i) {
         if (g.fga            != null && +g.fga > 0)  stateGames[i].fga  = Math.round(+g.fga);
         if (g.tpa            != null && +g.tpa > 0)  stateGames[i].tpa  = Math.round(+g.tpa);
-        if (g.defFgPct       != null && +g.defFgPct > 0) stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(3));
+        if (g.defFgPct       != null && +g.defFgPct > 0) stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2));
         if (g.assistsAllowed != null && +g.assistsAllowed > 0) stateDef[i].ast = Math.round(+g.assistsAllowed);
       });
     }
@@ -3020,7 +3028,7 @@ async function geminiAutofill() {
         var os = g.os || 0;
         if (os > 0) {
           if (!stateDef[i].fgPct || stateDef[i].fgPct === 0) {
-            stateDef[i].fgPct = parseFloat(Math.min(0.54, Math.max(0.38, (os - 10) / (os * 2.15))).toFixed(3));
+            stateDef[i].fgPct = parseFloat(Math.min(0.54, Math.max(0.38, (os - 10) / (os * 2.15))).toFixed(2));
           }
           if (!stateDef[i].ast || stateDef[i].ast === 0) {
             stateDef[i].ast = Math.round(Math.min(32, Math.max(14, os / 5.1)));
