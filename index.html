@@ -1547,10 +1547,11 @@ function getH2HStats() {
   const bWins   = complete.filter(g => g.b > g.a).length;
   const avgTotal  = parseFloat((totals.reduce((s,v)=>s+v,0)/totals.length).toFixed(1));
   const avgMargin = parseFloat((margins.reduce((s,v)=>s+v,0)/margins.length).toFixed(1));
-  // Trend: compare last vs first (if ≥2 games)
+  // Trend: index 0 = most recent, last index = oldest
+  // Rising = most recent total > oldest total
   let trend = 'stable';
   if (totals.length >= 2) {
-    const diff = totals[totals.length-1] - totals[0];
+    const diff = totals[0] - totals[totals.length - 1]; // most recent minus oldest
     trend = diff >= 6 ? 'rising' : diff <= -6 ? 'falling' : 'stable';
   }
   const dominant = aWins > bWins ? 'A' : bWins > aWins ? 'B' : 'even';
@@ -2811,7 +2812,7 @@ function applyStats(stats, teamA, teamB) {
 
 // ── MAIN: Gemini Autofill ─────────────────────────────────────
 // ── Shared: call Gemini with a prompt, return parsed JSON ─────
-async function callGemini(key, prompt, statusMsg) {
+async function callGemini(key, prompt, statusMsg, useUrlContext) {
   const MODELS = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
@@ -2821,10 +2822,15 @@ async function callGemini(key, prompt, statusMsg) {
   showFetchStatus('loading', statusMsg, [], []);
 
   async function tryModel(model) {
+    // Use both googleSearch + urlContext when available (urlContext lets Gemini
+    // actually fetch and read page content, not just search snippets)
+    var tools = useUrlContext
+      ? [{ googleSearch: {} }, { urlContext: {} }]
+      : [{ googleSearch: {} }];
     var body = {
       contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ googleSearch: {} }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+      tools: tools,
+      generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
     };
     var res = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key,
@@ -2835,12 +2841,15 @@ async function callGemini(key, prompt, statusMsg) {
       var msg = (data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
       var isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
       var isNotFound = res.status === 404 || msg.toLowerCase().includes('not found');
-      throw Object.assign(new Error(msg), { isQuota: isQuota, isNotFound: isNotFound });
+      // urlContext not supported on this model — retry without it
+      var isToolErr = msg.toLowerCase().includes('urlcontext') || msg.toLowerCase().includes('url_context') || msg.toLowerCase().includes('tool');
+      throw Object.assign(new Error(msg), { isQuota, isNotFound, isToolErr });
     }
     return { data: data, model: model };
   }
 
   var result = null, lastErr = null;
+  var triedWithout = false;
   for (var mi = 0; mi < MODELS.length; mi++) {
     try {
       result = await tryModel(MODELS[mi]);
@@ -2848,13 +2857,20 @@ async function callGemini(key, prompt, statusMsg) {
     } catch(e) {
       lastErr = e;
       console.warn('Model ' + MODELS[mi] + ' failed:', e.message);
+      // If urlContext caused the error, retry same model without it
+      if (e.isToolErr && useUrlContext && !triedWithout) {
+        useUrlContext = false;
+        triedWithout = true;
+        mi--; // retry same model
+        continue;
+      }
       if (e.isQuota || e.isNotFound) continue;
       break;
     }
   }
   if (!result) throw lastErr || new Error('All models failed.');
 
-  // Extract + deduplicate text parts
+  // Extract all text parts, deduplicate by 80-char prefix
   var rawParts = (result.data.candidates || [])
     .reduce(function(acc, c) { return acc.concat((c.content && c.content.parts) ? c.content.parts : []); }, [])
     .filter(function(p) { return p.text && p.text.trim().length > 10; })
@@ -2941,56 +2957,74 @@ async function geminiAutofill() {
     buildInputUI(); buildH2HUI(); saveState();
     showFetchStatus('loading', 'Step 2/2 — fetching shooting & defensive stats from SofaScore...', [], []);
 
-    // ── CALL 2: Statistics tab (FGA, 3PA, defFgPct, assists) ────
-    // Build a single focused prompt for all 6 games
+    // ── CALL 2: Statistics tab via URL fetching ─────────────────
+    // Build slug helpers for SofaScore URL patterns
+    function toSlug(name) {
+      return name.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim().replace(/\s+/g, '-');
+    }
+
+    // Build per-game search queries with the known final score as anchor
+    var gameEntries = [];
+    gA.forEach(function(g, i) {
+      var opp = g.opponent || 'opponent';
+      gameEntries.push({
+        label: 'A' + (i+1),
+        team: teamA, opp: opp,
+        score: g.teamScore + '-' + g.oppScore,
+        date: g.date || '',
+        forA: true
+      });
+    });
+    gB.forEach(function(g, i) {
+      var opp = g.opponent || 'opponent';
+      gameEntries.push({
+        label: 'B' + (i+1),
+        team: teamB, opp: opp,
+        score: g.teamScore + '-' + g.oppScore,
+        date: g.date || '',
+        forA: false
+      });
+    });
+
     var statsLines = [
-      'You are a basketball stats extractor. Today is ' + today + '.',
+      'You are a basketball statistics extractor. Today: ' + today + '.',
       '',
-      'I need shooting stats from the STATISTICS TAB on SofaScore for specific games.',
+      'Fetch each SofaScore game page below and read the STATISTICS tab.',
+      'Each URL is a search — click the correct game result matching the date and score shown.',
       '',
-      'HOW TO READ THE SOFASCORE STATISTICS TAB:',
-      'The Statistics tab shows two columns (home team LEFT, away team RIGHT) with rows like:',
-      '  "13/21  62%   Free throws   95%  20/21"   → FTM/FTA for each side',
-      '  "25/44  57%   2 pointers    44%  18/41"   → 2PM/2PA for each side',
-      '  " 7/26  27%   3 pointers    26%   6/23"   → 3PM/3PA. FGA = 26 (left) or 23 (right)',
-      '  "32/70  46%   Field goals   38%  24/64"   → FGM/FGA. FGA = 70 (left) or 64 (right). FG% = 46% (left) or 38% (right)',
-      '  "15         Assists        14"            → Assists = 15 (left team) 14 (right team)',
+      'SOFASCORE STATISTICS TAB LAYOUT (exactly as displayed):',
+      '  Left=Home team, Right=Away team',
+      '  Row "Field goals":   LeftFGM/LeftFGA  Left%  Field goals  Right%  RightFGM/RightFGA',
+      '  Row "3 pointers":    LeftFGM/LeftFGA  Left%  3 pointers   Right%  RightFGM/RightFGA',
+      '  Row "Assists":       LeftNum   Assists   RightNum',
       '',
-      'KEY RULES:',
-      '  - fga = the DENOMINATOR of the Field goals fraction for THIS team (not the opponent)',
-      '  - tpa = the DENOMINATOR of the 3 pointers fraction for THIS team',
-      '  - defFgPct = the Field goals PERCENTAGE of the OPPONENT (the other team FG%) as decimal',
-      '             e.g. if THIS team FG% = 46% and OPPONENT FG% = 38%, then defFgPct = 0.38',
-      '  - assistsAllowed = the Assists number belonging to the OPPONENT',
-      '  - Always identify which side (left or right) is THIS team first, then read the other side for def stats',
+      'EXTRACTION RULES (apply for each game):',
+      '  fga = denominator of Field goals fraction for THE NAMED TEAM (e.g. 32/70 → 70)',
+      '  tpa = denominator of 3 pointers fraction for THE NAMED TEAM (e.g. 7/26 → 26)',
+      '  defFgPct = Field goals % of the OPPONENT shown as decimal (38% → 0.38)',
+      '  assistsAllowed = Assists number of the OPPONENT',
+      '  Determine home/away from the page to know which side is left vs right.',
       ''
     ];
 
-    // Add each teamA game
-    gA.forEach(function(g, i) {
-      var opp = g.opponent || 'unknown opponent';
-      var score = g.teamScore + '-' + g.oppScore;
-      statsLines.push('GAME A' + (i+1) + ': ' + teamA + ' vs ' + opp + ' final score ' + score + ' on ' + (g.date || 'recent'));
-      statsLines.push('Search: sofascore ' + teamA + ' ' + opp + ' ' + (g.date||'').replace(/-/g,' ') + ' statistics');
-      statsLines.push('From the Statistics tab, extract for ' + teamA + ':');
-      statsLines.push('  fga (Field goals denominator for ' + teamA + '), tpa (3 pointers denominator for ' + teamA + '),');
-      statsLines.push('  defFgPct (' + opp + ' Field goals % as decimal), assistsAllowed (' + opp + ' Assists number)');
+    gameEntries.forEach(function(e) {
+      var slug1 = toSlug(e.team);
+      var slug2 = toSlug(e.opp);
+      var searchUrl = 'https://www.sofascore.com/search#query=' + encodeURIComponent(e.team + ' ' + e.opp + ' basketball');
+      statsLines.push('--- GAME ' + e.label + ' ---');
+      statsLines.push('Named team: ' + e.team);
+      statsLines.push('Opponent:   ' + e.opp);
+      statsLines.push('Date:       ' + (e.date || 'recent'));
+      statsLines.push('Score:      ' + e.score + ' (use this to verify you found the correct game)');
+      statsLines.push('Search URL: ' + searchUrl);
+      statsLines.push('Also try:   https://www.sofascore.com/' + slug1 + '-' + slug2 + '/');
+      statsLines.push('Navigate to Statistics tab. Extract fga, tpa, defFgPct, assistsAllowed for ' + e.team + '.');
       statsLines.push('');
     });
 
-    // Add each teamB game
-    gB.forEach(function(g, i) {
-      var opp = g.opponent || 'unknown opponent';
-      var score = g.teamScore + '-' + g.oppScore;
-      statsLines.push('GAME B' + (i+1) + ': ' + teamB + ' vs ' + opp + ' final score ' + score + ' on ' + (g.date || 'recent'));
-      statsLines.push('Search: sofascore ' + teamB + ' ' + opp + ' ' + (g.date||'').replace(/-/g,' ') + ' statistics');
-      statsLines.push('From the Statistics tab, extract for ' + teamB + ':');
-      statsLines.push('  fga (Field goals denominator for ' + teamB + '), tpa (3 pointers denominator for ' + teamB + '),');
-      statsLines.push('  defFgPct (' + opp + ' Field goals % as decimal), assistsAllowed (' + opp + ' Assists number)');
-      statsLines.push('');
-    });
-
-    statsLines.push('Return ONLY raw JSON — no markdown, no explanation, start with { end with }:');
+    statsLines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
     statsLines.push('{"gamesA":[');
     statsLines.push('  {"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},');
     statsLines.push('  {"fga":75,"tpa":28,"defFgPct":0.44,"assistsAllowed":19},');
@@ -3000,10 +3034,10 @@ async function geminiAutofill() {
     statsLines.push('  {"fga":78,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
     statsLines.push('  {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":22}');
     statsLines.push('],"sources":["SofaScore"]}');
-    statsLines.push('Use null for any value you cannot confirm. Do not guess or estimate.');
+    statsLines.push('Use null only if the stat is genuinely not on the page. Do not estimate.');
 
     var r2 = await callGemini(key, statsLines.join('\n'),
-      'Step 2/2 — fetching shooting & defensive stats...');
+      'Step 2/2 — reading SofaScore Statistics tabs...', true);
 
     var boxStats = parseStatsJson(r2.text);
     console.log('Box stats response:', r2.text);
@@ -3218,9 +3252,9 @@ function buildPredictionData(f) {
   if (h2h && h2h.count >= 2) {
     const h2hLine = h2h.avgTotal + 0.5;
     if (h2h.trend === 'rising') {
-      reasons.push({ color:'#10B981', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — rising trend (${h2h.totals.join('→')} pts). Supports over.` });
+      reasons.push({ color:'#10B981', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — rising trend (${[...h2h.totals].reverse().join('→')} pts oldest→recent). Supports over.` });
     } else if (h2h.trend === 'falling') {
-      reasons.push({ color:'#EF4444', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — falling trend (${h2h.totals.join('→')} pts). Supports under.` });
+      reasons.push({ color:'#EF4444', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — falling trend (${[...h2h.totals].reverse().join('→')} pts oldest→recent). Supports under.` });
     } else {
       reasons.push({ color:'#94A3B8', text:`H2H avg ${h2h.avgTotal} pts over ${h2h.count} meetings — stable pattern (${h2h.totals.join(', ')} pts).` });
     }
