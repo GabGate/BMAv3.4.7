@@ -2577,41 +2577,42 @@ function parseStatsJson(text) {
 function buildScoresPrompt(teamA, teamB, today) {
   return [
     'You are a basketball data assistant. Today is ' + today + '.',
-    'Search SofaScore, Flashscore, ESPN and LiveScore for COMPLETED basketball games.',
+    'Search SofaScore, Flashscore, ESPN for COMPLETED basketball games.',
     '',
-    '=== TASK A: Last 3 completed games for ' + teamA + ' ===',
-    'Go to SofaScore or Flashscore results page for ' + teamA + '.',
-    'List only games with status FT (Full Time) and a final score.',
-    'Dates must be BEFORE ' + today + '. Skip upcoming, live, or cancelled games.',
-    'Return the 3 most recent by date (newest first).',
-    'teamScore = ' + teamA + ' final score, oppScore = their opponent final score.',
+    '=== TASK A: Last 3 completed games for ' + teamA + ' (vs ANY opponent) ===',
+    'Search: sofascore.com ' + teamA + ' basketball results OR flashscore ' + teamA + ' basketball',
+    'IMPORTANT: Include games against ANY opponent — not just ' + teamB + '.',
+    'If ' + teamA + ' is in a playoff series vs ' + teamB + ', they also play other opponents.',
+    'List ALL completed games (FT status) sorted by date, pick the 3 MOST RECENT before ' + today + '.',
+    'For each game: date (YYYY-MM-DD), opponent name, ' + teamA + ' score, opponent score.',
+    'home: true if ' + teamA + ' was home team, false if away.',
     '',
-    '=== TASK B: Last 3 completed games for ' + teamB + ' ===',
-    'Same process for ' + teamB + '.',
-    'teamScore = ' + teamB + ' final score, oppScore = their opponent final score.',
+    '=== TASK B: Last 3 completed games for ' + teamB + ' (vs ANY opponent) ===',
+    'Same process — search results for ' + teamB + ' specifically.',
+    'Include games against ANY opponent, not just ' + teamA + '.',
+    'List the 3 MOST RECENT completed games before ' + today + '.',
+    'For each game: date, opponent name, ' + teamB + ' score, opponent score.',
+    'home: true if ' + teamB + ' was home team.',
     '',
-    '=== TASK C: H2H — games where ' + teamA + ' played directly vs ' + teamB + ' ===',
+    '=== TASK C: H2H — only direct meetings between ' + teamA + ' AND ' + teamB + ' ===',
     'Search SofaScore H2H tab for ' + teamA + ' vs ' + teamB + '.',
-    'List completed meetings sorted newest first. Return up to 3.',
+    'Find up to 3 most recent completed direct matchups (both teams must appear).',
     '',
-    'CRITICAL for H2H: the fields are named after the TEAMS, not home/away position:',
-    '  ' + teamA + 'Score = the points scored BY ' + teamA + ' in that game (regardless of home/away)',
-    '  ' + teamB + 'Score = the points scored BY ' + teamB + ' in that game (regardless of home/away)',
-    'Example: if Tortona 89 - Venezia 71 on 24/05/2026:',
-    '  ' + teamA + 'Score = 71 (Venezia scored 71), ' + teamB + 'Score = 89 (Tortona scored 89)',
-    '  OR if ' + teamA + '=Venezia and ' + teamB + '=Tortona: veneziaScore=71, tortonaScore=89',
+    'H2H SCORING RULE — use TEAM NAMES as field names, not home/away:',
+    '  "' + teamA + 'Score" = points scored BY ' + teamA + ' (regardless of whether home or away)',
+    '  "' + teamB + 'Score" = points scored BY ' + teamB + ' (regardless of whether home or away)',
     '',
     'Return ONLY raw JSON — no markdown, no text outside braces:',
     '{',
     '  "gamesA": [',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":84,"oppScore":74},',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":91,"oppScore":80},',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":78,"oppScore":82}',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":84,"oppScore":74,"home":true},',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":91,"oppScore":80,"home":false},',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":78,"oppScore":82,"home":true}',
     '  ],',
     '  "gamesB": [',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":88,"oppScore":76},',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":95,"oppScore":89},',
-    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":82,"oppScore":85}',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":88,"oppScore":76,"home":false},',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":95,"oppScore":89,"home":true},',
+    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":82,"oppScore":85,"home":false}',
     '  ],',
     '  "h2hGames": [',
     '    {"date":"YYYY-MM-DD","' + teamA + 'Score":71,"' + teamB + 'Score":89},',
@@ -2620,7 +2621,7 @@ function buildScoresPrompt(teamA, teamB, today) {
     '  ],',
     '  "sources": ["SofaScore"]',
     '}',
-    'Sort newest-first. Real verified scores only. No guesses.'
+    'CRITICAL: Each team must have its OWN 3 recent games. Do not reuse the same game for both teams.'
   ].join('\n');
 }
 
@@ -2628,77 +2629,71 @@ function buildStatsPrompt(teamA, teamB, gA, gB, today) {
   var lines = [
     'You are a basketball statistics extractor. Today: ' + today + '.',
     '',
-    'I need SHOOTING STATS for 6 specific basketball games.',
-    'Search multiple sources: SofaScore, ESPN box scores, basketball-reference, Flashscore.',
+    'I need SHOOTING STATISTICS for 6 specific basketball games.',
+    'For each game, find the SofaScore Statistics tab OR ESPN/Flashscore box score.',
     '',
-    '== HOW TO READ SOFASCORE STATISTICS TAB ==',
-    'Layout (Left team | Stat label | Right team):',
-    '  FGM/FGA   FG%   Field goals   FG%   FGM/FGA',
-    '  FGM/FGA   FG%   3 pointers    FG%   FGM/FGA',
-    '            Num   Assists       Num',
+    '== SOFASCORE STATISTICS TAB LAYOUT (left=home, right=away) ==',
+    '  HomeFGM/HomeFGA  Home%  Field goals  Away%  AwayFGM/AwayFGA',
+    '  HomeFGM/HomeTPA  Home%  3 pointers   Away%  AwayFGM/AwayTPA',
+    '  HomeAssists      Assists              AwayAssists',
     '',
-    'Example (from a real game screenshot):',
-    '  32/64  50%  Field goals  39%  25/64',
-    '  13/25  52%  3 pointers   35%   9/26',
-    '  23     Assists           18',
+    'Real example (Tortona HOME 82 - Venezia AWAY 71, SofaScore 22/05/2026):',
+    '  30/65  46%  Field goals  37%  22/60',
+    '  9/25   36%  3 pointers   23%   6/26',
+    '  15     Assists            7',
     '',
-    'From this example, for the LEFT team:',
-    '  fga = 64 (denominator of their Field goals fraction)',
-    '  tpa = 25 (denominator of their 3 pointers fraction)',
-    '  defFgPct = 0.39 (RIGHT team Field goals %, converted to decimal)',
-    '  assistsAllowed = 18 (RIGHT team Assists number)',
+    'For Tortona (HOME=LEFT): fga=65, tpa=25, defFgPct=0.37, assistsAllowed=7',
+    'For Venezia (AWAY=RIGHT): fga=60, tpa=26, defFgPct=0.46, assistsAllowed=15',
     '',
-    'For the RIGHT team:',
-    '  fga = 64, tpa = 26, defFgPct = 0.50, assistsAllowed = 23',
-    '',
-    'IMPORTANT: defFgPct is the OPPONENT percentage, not this team percentage.',
-    'assistsAllowed is the OPPONENT assists count.',
+    'RULES:',
+    '  fga = FGA denominator of THE NAMED TEAM (home team uses LEFT column, away uses RIGHT)',
+    '  tpa = 3PA denominator of THE NAMED TEAM',
+    '  defFgPct = OPPONENT field goal % as 2-decimal decimal (37% = 0.37, NOT 0.370)',
+    '  assistsAllowed = OPPONENT assists number',
+    '  ALWAYS check whether named team is HOME or AWAY before reading columns.',
     ''
   ];
 
   gA.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    lines.push('--- GAME A' + (i+1) + ' ---');
-    lines.push('Team: ' + teamA + '  vs  ' + opp);
-    lines.push('Date: ' + (g.date||'recent') + '  Final score: ' + g.teamScore + '-' + g.oppScore);
-    lines.push('Search ESPN/SofaScore/Flashscore for this exact game box score / statistics tab.');
-    lines.push('Extract FOR ' + teamA + ':');
-    lines.push('  fga = ' + teamA + ' total field goal attempts (FGA denominator)');
-    lines.push('  tpa = ' + teamA + ' total 3-point attempts (3PA denominator)');
-    lines.push('  defFgPct = ' + opp + ' field goal % as decimal (e.g. 38% = 0.38)');
-    lines.push('  assistsAllowed = ' + opp + ' total assists in this game');
+    var homeAway = g.home === true ? 'HOME (LEFT column on SofaScore)' : g.home === false ? 'AWAY (RIGHT column on SofaScore)' : 'check page';
+    var score = g.teamScore + '-' + g.oppScore;
+    lines.push('--- GAME A' + (i+1) + ': ' + teamA + ' vs ' + opp + ' ---');
+    lines.push(teamA + ' was: ' + homeAway);
+    lines.push('Date: ' + (g.date||'unknown') + ' | Final: ' + teamA + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: "' + teamA + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
+    lines.push('Extract FOR ' + teamA + ' (' + (g.home===true?'HOME/LEFT':g.home===false?'AWAY/RIGHT':'check') + ' side):');
+    lines.push('  fga, tpa (from ' + teamA + ' column), defFgPct and assistsAllowed (from ' + opp + ' column)');
     lines.push('');
   });
 
   gB.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    lines.push('--- GAME B' + (i+1) + ' ---');
-    lines.push('Team: ' + teamB + '  vs  ' + opp);
-    lines.push('Date: ' + (g.date||'recent') + '  Final score: ' + g.teamScore + '-' + g.oppScore);
-    lines.push('Search ESPN/SofaScore/Flashscore for this exact game box score / statistics tab.');
-    lines.push('Extract FOR ' + teamB + ':');
-    lines.push('  fga = ' + teamB + ' total field goal attempts');
-    lines.push('  tpa = ' + teamB + ' total 3-point attempts');
-    lines.push('  defFgPct = ' + opp + ' field goal % as decimal');
-    lines.push('  assistsAllowed = ' + opp + ' total assists in this game');
+    var homeAway = g.home === true ? 'HOME (LEFT column on SofaScore)' : g.home === false ? 'AWAY (RIGHT column on SofaScore)' : 'check page';
+    lines.push('--- GAME B' + (i+1) + ': ' + teamB + ' vs ' + opp + ' ---');
+    lines.push(teamB + ' was: ' + homeAway);
+    lines.push('Date: ' + (g.date||'unknown') + ' | Final: ' + teamB + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: "' + teamB + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
+    lines.push('Extract FOR ' + teamB + ' (' + (g.home===true?'HOME/LEFT':g.home===false?'AWAY/RIGHT':'check') + ' side):');
+    lines.push('  fga, tpa (from ' + teamB + ' column), defFgPct and assistsAllowed (from ' + opp + ' column)');
     lines.push('');
   });
 
   lines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
   lines.push('{');
   lines.push('  "gamesA":[');
-  lines.push('    {"fga":64,"tpa":25,"defFgPct":0.39,"assistsAllowed":18},');
+  lines.push('    {"fga":65,"tpa":25,"defFgPct":0.37,"assistsAllowed":7},');
   lines.push('    {"fga":70,"tpa":28,"defFgPct":0.44,"assistsAllowed":21},');
   lines.push('    {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
   lines.push('  ],');
   lines.push('  "gamesB":[');
-  lines.push('    {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":19},');
-  lines.push('    {"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":22},');
-  lines.push('    {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":20}');
+  lines.push('    {"fga":60,"tpa":26,"defFgPct":0.46,"assistsAllowed":15},');
+  lines.push('    {"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
+  lines.push('    {"fga":65,"tpa":21,"defFgPct":0.48,"assistsAllowed":20}');
   lines.push('  ],');
-  lines.push('  "sources":["SofaScore","ESPN"]');
+  lines.push('  "sources":["SofaScore"]');
   lines.push('}');
-  lines.push('Use null for stats you cannot find after searching. Do not estimate or invent values.');
+  lines.push('defFgPct must be 2 decimal places max (0.37 not 0.370 or 0.391). Use null if not found.');
   return lines.join('\n');
 }
 
