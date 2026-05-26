@@ -2550,150 +2550,150 @@ function markAutofilled() {
 // ── Build the prompt ──────────────────────────────────────────
 // ── Prompt 1: scores + dates (easy to find, always works) ────
 // ── Parse JSON from Gemini response (handles fences + duplicate blocks) ──
+// ── Parse JSON from Gemini response ──────────────────────────
 function parseStatsJson(text) {
   if (!text) return null;
-  var clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-  var candidates = [], depth = 0, start = -1;
-  for (var i = 0; i < clean.length; i++) {
-    if (clean[i] === '{') { if (depth === 0) start = i; depth++; }
-    else if (clean[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) { candidates.push(clean.slice(start, i+1)); start = -1; }
-    }
+  var clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+  var candidates=[], depth=0, start=-1;
+  for (var i=0;i<clean.length;i++) {
+    if (clean[i]==='{'){if(depth===0)start=i;depth++;}
+    else if (clean[i]==='}'){depth--;if(depth===0&&start!==-1){candidates.push(clean.slice(start,i+1));start=-1;}}
   }
-  candidates.sort(function(a,b){ return b.length - a.length; });
-  for (var j = 0; j < candidates.length; j++) {
-    try {
-      var obj = JSON.parse(candidates[j]);
-      if (obj && (obj.gamesA || obj.gamesB || obj.gameA || obj.gameB)) return obj;
-    } catch(_) {}
+  candidates.sort(function(a,b){return b.length-a.length;});
+  for (var j=0;j<candidates.length;j++){
+    try{var o=JSON.parse(candidates[j]);if(o&&(o.gamesA||o.gamesB||o.h2hGames))return o;}catch(_){}
   }
-  for (var k = 0; k < candidates.length; k++) {
-    try { return JSON.parse(candidates[k]); } catch(_) {}
-  }
+  for (var k=0;k<candidates.length;k++){try{return JSON.parse(candidates[k]);}catch(_){}}
   return null;
 }
 
+// ── Prompt 1: Scores + H2H ────────────────────────────────────
 function buildScoresPrompt(teamA, teamB, today) {
   return [
-    'You are a basketball data assistant. Today is ' + today + '.',
-    'Search SofaScore, Flashscore, ESPN for COMPLETED basketball games.',
+    'Basketball data lookup. Today: ' + today + '.',
+    'Search SofaScore, Flashscore, ESPN for COMPLETED games (FT = Full Time only).',
     '',
-    '=== TASK A: Last 3 completed games for ' + teamA + ' (vs ANY opponent) ===',
-    'Search: sofascore.com ' + teamA + ' basketball results OR flashscore ' + teamA + ' basketball',
-    'IMPORTANT: Include games against ANY opponent — not just ' + teamB + '.',
-    'If ' + teamA + ' is in a playoff series vs ' + teamB + ', they also play other opponents.',
-    'List ALL completed games (FT status) sorted by date, pick the 3 MOST RECENT before ' + today + '.',
-    'For each game: date (YYYY-MM-DD), opponent name, ' + teamA + ' score, opponent score.',
-    'home: true if ' + teamA + ' was home team, false if away.',
+    '=== TASK 1: Last 3 completed games for ' + teamA + ' ===',
+    'Search: ' + teamA + ' basketball results site:sofascore.com OR site:flashscore.com',
+    'Go to their results page. List all FT games sorted by date newest first.',
+    'Take the 3 MOST RECENT completed games before ' + today + '.',
+    'Include games vs ANY opponent (not only ' + teamB + ').',
+    'Do NOT skip the most recent game. Index 0 must be the very latest completed game.',
     '',
-    '=== TASK B: Last 3 completed games for ' + teamB + ' (vs ANY opponent) ===',
-    'Same process — search results for ' + teamB + ' specifically.',
-    'Include games against ANY opponent, not just ' + teamA + '.',
-    'List the 3 MOST RECENT completed games before ' + today + '.',
-    'For each game: date, opponent name, ' + teamB + ' score, opponent score.',
-    'home: true if ' + teamB + ' was home team.',
+    'For each game return:',
+    '  date: YYYY-MM-DD',
+    '  opponent: the other team name',
+    '  teamScore: ' + teamA + ' final score (integer)',
+    '  oppScore: opponent final score (integer)',
+    '  home: true if ' + teamA + ' was the home team, false if away',
     '',
-    '=== TASK C: H2H — only direct meetings between ' + teamA + ' AND ' + teamB + ' ===',
-    'Search SofaScore H2H tab for ' + teamA + ' vs ' + teamB + '.',
-    'Find up to 3 most recent completed direct matchups (both teams must appear).',
+    '=== TASK 2: Last 3 completed games for ' + teamB + ' ===',
+    'Same process — separate search for ' + teamB + ' results.',
+    'Take the 3 MOST RECENT completed games before ' + today + '.',
+    'Do NOT skip the most recent game.',
     '',
-    'H2H SCORING RULE — use TEAM NAMES as field names, not home/away:',
-    '  "' + teamA + 'Score" = points scored BY ' + teamA + ' (regardless of whether home or away)',
-    '  "' + teamB + 'Score" = points scored BY ' + teamB + ' (regardless of whether home or away)',
+    '=== TASK 3: H2H — direct meetings between ' + teamA + ' AND ' + teamB + ' only ===',
+    'Search: ' + teamA + ' vs ' + teamB + ' h2h basketball sofascore',
+    'Find up to 3 most recent completed direct matchups.',
+    'teamAScore = points scored BY ' + teamA + ' (regardless of home/away)',
+    'teamBScore = points scored BY ' + teamB + ' (regardless of home/away)',
     '',
-    'Return ONLY raw JSON — no markdown, no text outside braces:',
+    'Return ONLY raw JSON, no markdown:',
     '{',
-    '  "gamesA": [',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":84,"oppScore":74,"home":true},',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":91,"oppScore":80,"home":false},',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":78,"oppScore":82,"home":true}',
+    '  "gamesA":[',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":84,"oppScore":74,"home":true},',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":91,"oppScore":80,"home":false},',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":78,"oppScore":82,"home":true}',
     '  ],',
-    '  "gamesB": [',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":88,"oppScore":76,"home":false},',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":95,"oppScore":89,"home":true},',
-    '    {"date":"YYYY-MM-DD","opponent":"Any Opponent","teamScore":82,"oppScore":85,"home":false}',
+    '  "gamesB":[',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":88,"oppScore":76,"home":false},',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":95,"oppScore":89,"home":true},',
+    '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":82,"oppScore":85,"home":false}',
     '  ],',
-    '  "h2hGames": [',
-    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":71,"' + teamB + 'Score":89},',
-    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":71,"' + teamB + 'Score":82},',
-    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":87,"' + teamB + 'Score":75}',
+    '  "h2hGames":[',
+    '    {"date":"YYYY-MM-DD","teamAScore":71,"teamBScore":89},',
+    '    {"date":"YYYY-MM-DD","teamAScore":71,"teamBScore":82},',
+    '    {"date":"YYYY-MM-DD","teamAScore":87,"teamBScore":75}',
     '  ],',
-    '  "sources": ["SofaScore"]',
-    '}',
-    'CRITICAL: Each team must have its OWN 3 recent games. Do not reuse the same game for both teams.'
+    '  "sources":["SofaScore"]',
+    '}'
   ].join('\n');
 }
 
+// ── Prompt 2: Box stats (FGA, 3PA, FGM, FG%, Assists) ────────
 function buildStatsPrompt(teamA, teamB, gA, gB, today) {
   var lines = [
-    'You are a basketball statistics extractor. Today: ' + today + '.',
+    'Basketball statistics extractor. Today: ' + today + '.',
     '',
-    'I need SHOOTING STATISTICS for 6 specific basketball games.',
-    'For each game, find the SofaScore Statistics tab OR ESPN/Flashscore box score.',
+    'Find the SofaScore Statistics tab (or ESPN/Flashscore box score) for each game below.',
+    'Extract the SHOOTING statistics for the named team.',
     '',
-    '== SOFASCORE STATISTICS TAB LAYOUT (left=home, right=away) ==',
-    '  HomeFGM/HomeFGA  Home%  Field goals  Away%  AwayFGM/AwayFGA',
-    '  HomeFGM/HomeTPA  Home%  3 pointers   Away%  AwayFGM/AwayTPA',
-    '  HomeAssists      Assists              AwayAssists',
+    '== SOFASCORE STATISTICS TAB — how to read it ==',
+    'Left column = HOME team. Right column = AWAY team.',
     '',
-    'Real example (Tortona HOME 82 - Venezia AWAY 71, SofaScore 22/05/2026):',
+    'Row "Field goals":  HomeFGM/HomeFGA  Home%  Field goals  Away%  AwayFGM/AwayFGA',
+    'Row "3 pointers":   HomeFGM/Home3PA  Home%  3 pointers   Away%  AwayFGM/Away3PA',
+    'Row "Assists":      HomeAST          Assists              AwayAST',
+    '',
+    'VERIFIED EXAMPLE from Tortona(HOME) 82-71 Venezia(AWAY) on 22/05/2026:',
     '  30/65  46%  Field goals  37%  22/60',
     '  9/25   36%  3 pointers   23%   6/26',
     '  15     Assists            7',
     '',
-    'For Tortona (HOME=LEFT): fga=65, tpa=25, defFgPct=0.37, assistsAllowed=7',
-    'For Venezia (AWAY=RIGHT): fga=60, tpa=26, defFgPct=0.46, assistsAllowed=15',
+    'From this: Tortona(HOME/LEFT): FGM=30,FGA=65,3PA=25,FG%=46%,oppFG%=37%,oppAST=7',
+    '           Venezia(AWAY/RIGHT): FGM=22,FGA=60,3PA=26,FG%=37%,oppFG%=46%,oppAST=15',
     '',
-    'RULES:',
-    '  fga = FGA denominator of THE NAMED TEAM (home team uses LEFT column, away uses RIGHT)',
-    '  tpa = 3PA denominator of THE NAMED TEAM',
-    '  defFgPct = OPPONENT field goal % as 2-decimal decimal (37% = 0.37, NOT 0.370)',
+    'EXTRACTION RULES:',
+    '  fgm = FGM of THE NAMED TEAM (their made field goals)',
+    '  fga = FGA of THE NAMED TEAM (denominator of their Field goals fraction)',
+    '  tpa = 3PA of THE NAMED TEAM (denominator of their 3 pointers fraction)',
+    '  defFgPct = OPPONENT FG% as 2-decimal (37% -> 0.37). This is opponent made/attempted.',
     '  assistsAllowed = OPPONENT assists number',
-    '  ALWAYS check whether named team is HOME or AWAY before reading columns.',
+    '  IF defFgPct not found: calculate as oppFGM/oppFGA (e.g. 22/60 = 0.37)',
+    '  IF fga found but defFgPct not found: it MUST be calculable from the page.',
+    '  Named team is HOME use LEFT column. Named team is AWAY use RIGHT column.',
     ''
   ];
 
   gA.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    var homeAway = g.home === true ? 'HOME (LEFT column on SofaScore)' : g.home === false ? 'AWAY (RIGHT column on SofaScore)' : 'check page';
-    var score = g.teamScore + '-' + g.oppScore;
-    lines.push('--- GAME A' + (i+1) + ': ' + teamA + ' vs ' + opp + ' ---');
-    lines.push(teamA + ' was: ' + homeAway);
-    lines.push('Date: ' + (g.date||'unknown') + ' | Final: ' + teamA + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
-    lines.push('Search: "' + teamA + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
-    lines.push('Extract FOR ' + teamA + ' (' + (g.home===true?'HOME/LEFT':g.home===false?'AWAY/RIGHT':'check') + ' side):');
-    lines.push('  fga, tpa (from ' + teamA + ' column), defFgPct and assistsAllowed (from ' + opp + ' column)');
+    var side = g.home === true ? 'HOME → use LEFT column' : g.home === false ? 'AWAY → use RIGHT column' : 'check page';
+    lines.push('--- GAME A' + (i+1) + ' ---');
+    lines.push('Named team: ' + teamA + ' (' + side + ')');
+    lines.push('Opponent:   ' + opp);
+    lines.push('Date: ' + (g.date||'?') + ' | Score: ' + teamA + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: "' + teamA + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' statistics sofascore');
+    lines.push('Extract: fgm, fga, tpa for ' + teamA + '; defFgPct and assistsAllowed for ' + opp);
     lines.push('');
   });
 
   gB.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    var homeAway = g.home === true ? 'HOME (LEFT column on SofaScore)' : g.home === false ? 'AWAY (RIGHT column on SofaScore)' : 'check page';
-    lines.push('--- GAME B' + (i+1) + ': ' + teamB + ' vs ' + opp + ' ---');
-    lines.push(teamB + ' was: ' + homeAway);
-    lines.push('Date: ' + (g.date||'unknown') + ' | Final: ' + teamB + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
-    lines.push('Search: "' + teamB + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
-    lines.push('Extract FOR ' + teamB + ' (' + (g.home===true?'HOME/LEFT':g.home===false?'AWAY/RIGHT':'check') + ' side):');
-    lines.push('  fga, tpa (from ' + teamB + ' column), defFgPct and assistsAllowed (from ' + opp + ' column)');
+    var side = g.home === true ? 'HOME → use LEFT column' : g.home === false ? 'AWAY → use RIGHT column' : 'check page';
+    lines.push('--- GAME B' + (i+1) + ' ---');
+    lines.push('Named team: ' + teamB + ' (' + side + ')');
+    lines.push('Opponent:   ' + opp);
+    lines.push('Date: ' + (g.date||'?') + ' | Score: ' + teamB + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: "' + teamB + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' statistics sofascore');
+    lines.push('Extract: fgm, fga, tpa for ' + teamB + '; defFgPct and assistsAllowed for ' + opp);
     lines.push('');
   });
 
-  lines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
+  lines.push('Return ONLY raw JSON, no markdown:');
   lines.push('{');
   lines.push('  "gamesA":[');
-  lines.push('    {"fga":65,"tpa":25,"defFgPct":0.37,"assistsAllowed":7},');
-  lines.push('    {"fga":70,"tpa":28,"defFgPct":0.44,"assistsAllowed":21},');
-  lines.push('    {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
+  lines.push('    {"fgm":30,"fga":65,"tpa":25,"defFgPct":0.37,"assistsAllowed":7},');
+  lines.push('    {"fgm":28,"fga":70,"tpa":28,"defFgPct":0.44,"assistsAllowed":21},');
+  lines.push('    {"fgm":26,"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
   lines.push('  ],');
   lines.push('  "gamesB":[');
-  lines.push('    {"fga":60,"tpa":26,"defFgPct":0.46,"assistsAllowed":15},');
-  lines.push('    {"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
-  lines.push('    {"fga":65,"tpa":21,"defFgPct":0.48,"assistsAllowed":20}');
+  lines.push('    {"fgm":22,"fga":60,"tpa":26,"defFgPct":0.46,"assistsAllowed":15},');
+  lines.push('    {"fgm":30,"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
+  lines.push('    {"fgm":27,"fga":65,"tpa":21,"defFgPct":0.48,"assistsAllowed":20}');
   lines.push('  ],');
   lines.push('  "sources":["SofaScore"]');
   lines.push('}');
-  lines.push('defFgPct must be 2 decimal places max (0.37 not 0.370 or 0.391). Use null if not found.');
+  lines.push('defFgPct: 2 decimal max. If not on page, compute oppFGM/oppFGA. Never leave null if fga is found.');
   return lines.join('\n');
 }
 
@@ -2701,325 +2701,253 @@ function buildGeminiPrompt(teamA, teamB, today) {
   return buildScoresPrompt(teamA, teamB, today);
 }
 
+// ── Estimate def stats when all else fails ────────────────────
 function estimateDefStats(os) {
-  if (!os || os <= 0) return { fgPct: null, ast: null };
-  // Use FG% = oppScore / (oppScore + ftEstimate) / avgFgaRatio
-  // Simpler calibrated estimate: median NBA/EuroLeague ~0.46 FG%
-  // Adjust: high-scoring games trend slightly higher FG%
-  var fgPct = parseFloat(Math.min(0.54, Math.max(0.36, 0.435 + (os - 80) * 0.001)).toFixed(2));
-  // Assists: ~1 per 4.5 pts in European leagues, ~1 per 5 pts NBA
-  var ast = Math.round(Math.min(30, Math.max(12, os / 4.7)));
-  return { fgPct: fgPct, ast: ast };
+  if (!os||os<=0) return {fgPct:null,ast:null};
+  var fgPct = parseFloat(Math.min(0.54,Math.max(0.36,0.435+(os-80)*0.001)).toFixed(2));
+  var ast   = Math.round(Math.min(30,Math.max(12,os/4.7)));
+  return {fgPct:fgPct, ast:ast};
 }
 
+// ── Apply full stats from applyStats (legacy path) ────────────
 function applyStats(stats, teamA, teamB) {
-  var filled = [], warnings = [];
-
-  function sortGames(arr) {
-    if (!arr || !arr.length) return arr;
-    var dated = arr.map(function(g) {
-      var m = (g.gameLabel || g.date || '').match(/(\d{4}-\d{2}-\d{2})/);
-      return { g: g, date: m ? m[1] : null };
-    });
-    if (dated.filter(function(d){ return d.date; }).length >= 2) {
-      dated.sort(function(a, b) {
-        if (!a.date) return 1; if (!b.date) return -1;
-        return b.date.localeCompare(a.date);
-      });
-    }
-    return dated.map(function(d){ return d.g; });
+  var filled=[], warnings=[];
+  function sortGames(arr){
+    if(!arr||!arr.length) return arr;
+    var d=arr.map(function(g){var m=(g.gameLabel||g.date||'').match(/(\d{4}-\d{2}-\d{2})/);return{g:g,date:m?m[1]:null};});
+    if(d.filter(function(x){return x.date;}).length>=2) d.sort(function(a,b){if(!a.date)return 1;if(!b.date)return -1;return b.date.localeCompare(a.date);});
+    return d.map(function(x){return x.g;});
   }
-
-  function fillTeam(gamesArr, stateGames, stateDef, name) {
-    var games = sortGames(gamesArr);
-    if (!games || !games.length) { warnings.push(name + ' games not found'); return; }
-    var defReal = 0, defEst = 0;
-    games.slice(0, 3).forEach(function(g, i) {
-      if (g.teamScore != null) stateGames[i].ts = Math.round(+g.teamScore);
-      if (g.oppScore  != null) stateGames[i].os = Math.round(+g.oppScore);
-      if (g.fga != null && +g.fga > 0) stateGames[i].fga = Math.round(+g.fga);
-      if (g.tpa != null && +g.tpa > 0) stateGames[i].tpa = Math.round(+g.tpa);
-      if (g.defFgPct != null && +g.defFgPct > 0) {
-        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2)); defReal++;
-      } else {
-        var est = estimateDefStats(stateGames[i].os);
-        if (est.fgPct) { stateDef[i].fgPct = est.fgPct; defEst++; }
-      }
-      if (g.assistsAllowed != null && +g.assistsAllowed > 0) {
-        stateDef[i].ast = Math.round(+g.assistsAllowed);
-      } else {
-        var e2 = estimateDefStats(stateGames[i].os);
-        if (e2.ast) stateDef[i].ast = e2.ast;
-      }
+  function fillTeam(arr,sg,sd,name){
+    var gs=sortGames(arr);
+    if(!gs||!gs.length){warnings.push(name+' games not found');return;}
+    gs.slice(0,3).forEach(function(g,i){
+      if(g.teamScore!=null) sg[i].ts=Math.round(+g.teamScore);
+      if(g.oppScore!=null)  sg[i].os=Math.round(+g.oppScore);
+      if(g.fga!=null&&+g.fga>0) sg[i].fga=Math.round(+g.fga);
+      if(g.tpa!=null&&+g.tpa>0) sg[i].tpa=Math.round(+g.tpa);
+      var fgPct=null;
+      if(g.defFgPct!=null&&+g.defFgPct>0) fgPct=parseFloat((+g.defFgPct).toFixed(2));
+      else if(g.fgm!=null&&g.fga!=null&&+g.fga>0) fgPct=parseFloat((+g.fgm/+g.fga).toFixed(2));
+      if(fgPct) sd[i].fgPct=fgPct;
+      if(g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
     });
-    filled.push(name + ': ' + Math.min(games.length, 3) + ' games');
-    if (defReal > 0) filled.push(name + ' def: ' + defReal + '/3 real');
-    else { filled.push(name + ' def: estimated'); warnings.push(name + ' FG%/assists estimated — verify on SofaScore'); }
+    filled.push(name+': '+Math.min(gs.length,3)+' games');
   }
-
-  fillTeam(stats.gamesA || [], state.gamesA, state.defA, teamA);
-  fillTeam(stats.gamesB || [], state.gamesB, state.defB, teamB);
-
-  state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}];
-  if (stats.h2hGames && stats.h2hGames.length) {
-    var h2h = stats.h2hGames.slice().sort(function(a,b){
-      if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
+  fillTeam(stats.gamesA||[],state.gamesA,state.defA,teamA);
+  fillTeam(stats.gamesB||[],state.gamesB,state.defB,teamB);
+  state.h2hGames=[{a:null,b:null},{a:null,b:null},{a:null,b:null}];
+  if(stats.h2hGames&&stats.h2hGames.length){
+    var h2h=stats.h2hGames.slice().sort(function(a,b){if(!a.date||!b.date)return 0;return b.date.localeCompare(a.date);});
+    var seen={},hf=[];
+    h2h.forEach(function(g){var k=g.date||('x'+hf.length);if(!seen[k]&&hf.length<3){seen[k]=true;hf.push(g);}});
+    hf.forEach(function(g,i){
+      var a=g.teamAScore!=null?+g.teamAScore:(g.a!=null?+g.a:null);
+      var b=g.teamBScore!=null?+g.teamBScore:(g.b!=null?+g.b:null);
+      if(a!=null) state.h2hGames[i].a=Math.round(a);
+      if(b!=null) state.h2hGames[i].b=Math.round(b);
     });
-    h2h.slice(0,3).forEach(function(g,i){
-      if (g.a != null) state.h2hGames[i].a = Math.round(+g.a);
-      if (g.b != null) state.h2hGames[i].b = Math.round(+g.b);
-      if (g.teamAScore != null) state.h2hGames[i].a = Math.round(+g.teamAScore);
-      if (g.teamBScore != null) state.h2hGames[i].b = Math.round(+g.teamBScore);
-    });
-    filled.push('H2H: ' + Math.min(h2h.length,3) + ' result(s)');
-    if (h2h.length < 3) warnings.push('Only ' + h2h.length + ' H2H game(s) found — remaining slots blank');
-  } else { warnings.push('No H2H history found — fill manually'); }
-
-  if (stats.sources && stats.sources.length) filled.push('Sources: ' + stats.sources.join(', '));
-  buildInputUI(); buildH2HUI(); checkDataCompleteness(); saveState(); markAutofilled();
-  var q = warnings.filter(function(w){ return w.indexOf('not found') !== -1; }).length ? 'failed'
-        : warnings.length === 0 ? 'success' : 'partial';
-  showFetchStatus(q,
-    q==='success' ? '\u2713 '+teamA+' vs '+teamB+' filled! Select League Preset below.'
-    : q==='partial' ? '\u29d6 '+teamA+' vs '+teamB+' filled. Some stats estimated.'
-    : '\u2715 Limited data. Fill manually.',
-    filled, warnings);
+    filled.push('H2H: '+Math.min(hf.length,3));
+  } else warnings.push('No H2H found');
+  buildInputUI();buildH2HUI();checkDataCompleteness();saveState();markAutofilled();
+  var q=warnings.filter(function(w){return w.indexOf('not found')!==-1;}).length?'failed':warnings.length===0?'success':'partial';
+  showFetchStatus(q,q==='success'?'\u2713 Filled!':q==='partial'?'\u29d6 Partial fill — check warnings':'\u2715 Limited data',filled,warnings);
 }
 
+// ── Gemini API call with model fallback ───────────────────────
 async function callGemini(key, prompt, statusMsg, useUrlContext) {
-  // Model list updated from actual API — best free-tier models that support googleSearch
-  // gemini-3.x are preview-only; gemini-2.5-flash is primary; fallback chain below
-  var MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash-001',
-    'gemini-2.0-flash-lite-001',
-  ];
+  var MODELS=['gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-2.5-flash-lite','gemini-2.0-flash-001','gemini-2.0-flash-lite-001'];
   showFetchStatus('loading', statusMsg, [], []);
-  var triedWithoutUrl = false;
+  var triedWithoutUrl=false;
 
   async function tryModel(model, withUrl) {
-    var tools = withUrl ? [{googleSearch:{}},{urlContext:{}}] : [{googleSearch:{}}];
-    var body = {
-      contents: [{parts:[{text:prompt}]}],
-      tools: tools,
-      generationConfig: {temperature:0.0, maxOutputTokens:8192}
-    };
-    var res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key,
-      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}
-    );
-    var data = await res.json();
-    if (!res.ok) {
-      var msg = (data.error && data.error.message) ? data.error.message : ('HTTP '+res.status);
-      var isQuota = res.status===429 || res.status===503 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('high demand') || msg.toLowerCase().includes('overloaded');
-      var isNotFound = res.status===404 || msg.toLowerCase().includes('not found');
-      var isToolErr = msg.toLowerCase().includes('urlcontext') || msg.toLowerCase().includes('url_context') || (res.status===400 && withUrl);
-      throw Object.assign(new Error(msg), {isQuota:isQuota, isNotFound:isNotFound, isToolErr:isToolErr});
+    var tools=withUrl?[{googleSearch:{}},{urlContext:{}}]:[{googleSearch:{}}];
+    var body={contents:[{parts:[{text:prompt}]}],tools:tools,generationConfig:{temperature:0.0,maxOutputTokens:8192}};
+    var res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var data=await res.json();
+    if(!res.ok){
+      var msg=(data.error&&data.error.message)?data.error.message:('HTTP '+res.status);
+      var isQuota=res.status===429||res.status===503||msg.toLowerCase().includes('quota')||msg.toLowerCase().includes('rate')||msg.toLowerCase().includes('high demand')||msg.toLowerCase().includes('overloaded');
+      var isNotFound=res.status===404||msg.toLowerCase().includes('not found');
+      var isToolErr=res.status===400&&withUrl;
+      throw Object.assign(new Error(msg),{isQuota:isQuota,isNotFound:isNotFound,isToolErr:isToolErr});
     }
-    return {data:data, model:model};
+    return {data:data,model:model};
   }
 
-  var result = null, lastErr = null;
-  for (var mi = 0; mi < MODELS.length; mi++) {
-    var withUrl = useUrlContext && !triedWithoutUrl;
-    try {
-      result = await tryModel(MODELS[mi], withUrl);
-      break;
-    } catch(e) {
-      lastErr = e;
-      console.warn('Model '+MODELS[mi]+' failed:', e.message);
-      if (e.isToolErr && useUrlContext && !triedWithoutUrl) {
-        triedWithoutUrl = true; mi--; continue;
-      }
-      if (e.isQuota || e.isNotFound) continue;
+  var result=null,lastErr=null;
+  for(var mi=0;mi<MODELS.length;mi++){
+    var withUrl=useUrlContext&&!triedWithoutUrl;
+    try{result=await tryModel(MODELS[mi],withUrl);break;}
+    catch(e){
+      lastErr=e;console.warn('Model '+MODELS[mi]+' failed:',e.message);
+      if(e.isToolErr&&useUrlContext&&!triedWithoutUrl){triedWithoutUrl=true;mi--;continue;}
+      if(e.isQuota||e.isNotFound) continue;
       break;
     }
   }
-  if (!result) throw lastErr || new Error('All models failed.');
+  if(!result) throw lastErr||new Error('All models failed.');
 
-  var rawParts = (result.data.candidates||[])
-    .reduce(function(acc,c){ return acc.concat((c.content&&c.content.parts)?c.content.parts:[]); },[])
-    .filter(function(p){ return p.text && p.text.trim().length > 10; })
-    .map(function(p){ return p.text.trim(); });
-  var seen={}, unique=[];
-  rawParts.forEach(function(t){ var k=t.slice(0,80); if(!seen[k]){seen[k]=true;unique.push(t);} });
-  var text = unique.join('\n');
-  if (!text) throw new Error(result.model + ' returned empty response.');
-  return {text:text, model:result.model};
+  var raw=(result.data.candidates||[])
+    .reduce(function(acc,c){return acc.concat((c.content&&c.content.parts)?c.content.parts:[]);},[])
+    .filter(function(p){return p.text&&p.text.trim().length>10;})
+    .map(function(p){return p.text.trim();});
+  var seen={},unique=[];
+  raw.forEach(function(t){var k=t.slice(0,80);if(!seen[k]){seen[k]=true;unique.push(t);}});
+  var text=unique.join('\n');
+  if(!text) throw new Error(result.model+' returned empty response.');
+  return {text:text,model:result.model};
 }
 
+// ── Main autofill ─────────────────────────────────────────────
 async function geminiAutofill() {
-  var teamA = (document.getElementById('claudeTeamA')||{}).value||'';
-  var teamB = (document.getElementById('claudeTeamB')||{}).value||'';
-  teamA = teamA.trim(); teamB = teamB.trim();
-  if (!teamA||!teamB) { showFetchStatus('failed','Enter both team names above first.',[],[]); return; }
+  var teamA=((document.getElementById('claudeTeamA')||{}).value||'').trim();
+  var teamB=((document.getElementById('claudeTeamB')||{}).value||'').trim();
+  if(!teamA||!teamB){showFetchStatus('failed','Enter both team names above first.',[],[]);return;}
 
-  var key = getGeminiKey();
-  if (!key) { showFetchStatus('failed','No Gemini API key saved. Go to Settings.',[],[]); return; }
+  var key=getGeminiKey();
+  if(!key){showFetchStatus('failed','No Gemini API key. Go to Settings.',[],[]);return;}
 
-  var btn=document.getElementById('geminiAutofillBtn'), sp=document.getElementById('geminiSpinner');
-  if (btn) btn.disabled=true;
-  if (sp)  sp.style.display='inline-block';
+  var btn=document.getElementById('geminiAutofillBtn'),sp=document.getElementById('geminiSpinner');
+  if(btn) btn.disabled=true;
+  if(sp)  sp.style.display='inline-block';
 
-  state.teamAName=teamA; state.teamBName=teamB;
-  var tAEl=document.getElementById('teamAName'), tBEl=document.getElementById('teamBName');
-  if (tAEl) tAEl.value=teamA;
-  if (tBEl) tBEl.value=teamB;
+  state.teamAName=teamA;state.teamBName=teamB;
+  var tA=document.getElementById('teamAName'),tB=document.getElementById('teamBName');
+  if(tA) tA.value=teamA; if(tB) tB.value=teamB;
 
-  var today = new Date().toISOString().split('T')[0];
+  var today=new Date().toISOString().split('T')[0];
 
   try {
     // ── CALL 1: Scores + H2H ─────────────────────────────────
-    var r1 = await callGemini(key, buildScoresPrompt(teamA,teamB,today),
-      'Step 1/2 — searching results & H2H for '+teamA+' & '+teamB+'...');
-
-    var scores = parseStatsJson(r1.text);
-    if (!scores||(!scores.gamesA&&!scores.gamesB)) {
-      console.error('Scores raw:', r1.text);
-      throw new Error('Could not parse scores. Check console.');
+    var r1=await callGemini(key,buildScoresPrompt(teamA,teamB,today),'Step 1/2 — getting last 3 games & H2H for '+teamA+' & '+teamB+'…');
+    var scores=parseStatsJson(r1.text);
+    if(!scores||(!scores.gamesA&&!scores.gamesB)){
+      console.error('Scores raw:',r1.text);
+      throw new Error('Could not parse scores from Gemini. Logged to console.');
     }
 
-    function topThree(arr) {
-      if (!arr||!arr.length) return [];
+    // Sort newest-first, take top 3
+    function top3(arr){
+      if(!arr||!arr.length) return [];
       return arr.slice().sort(function(a,b){
         if(!a.date) return 1; if(!b.date) return -1;
         return b.date.localeCompare(a.date);
       }).slice(0,3);
     }
-    var gA = topThree(scores.gamesA||[]);
-    var gB = topThree(scores.gamesB||[]);
+    var gA=top3(scores.gamesA||[]);
+    var gB=top3(scores.gamesB||[]);
 
-    // Apply scores immediately
+    // Fill scores immediately into state
     gA.forEach(function(g,i){
-      if (g.teamScore!=null) state.gamesA[i].ts=Math.round(+g.teamScore);
-      if (g.oppScore!=null)  state.gamesA[i].os=Math.round(+g.oppScore);
+      if(g.teamScore!=null) state.gamesA[i].ts=Math.round(+g.teamScore);
+      if(g.oppScore!=null)  state.gamesA[i].os=Math.round(+g.oppScore);
     });
     gB.forEach(function(g,i){
-      if (g.teamScore!=null) state.gamesB[i].ts=Math.round(+g.teamScore);
-      if (g.oppScore!=null)  state.gamesB[i].os=Math.round(+g.oppScore);
+      if(g.teamScore!=null) state.gamesB[i].ts=Math.round(+g.teamScore);
+      if(g.oppScore!=null)  state.gamesB[i].os=Math.round(+g.oppScore);
     });
 
-    // Apply H2H — reset all 3 slots first
+    // Fill H2H — reset slots first
     state.h2hGames=[{a:null,b:null},{a:null,b:null},{a:null,b:null}];
-    if (scores.h2hGames && scores.h2hGames.length) {
-      var h2h = scores.h2hGames.slice().sort(function(a,b){
-        if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
+    if(scores.h2hGames&&scores.h2hGames.length){
+      var h2h=scores.h2hGames.slice().sort(function(a,b){
+        if(!a.date||!b.date)return 0;return b.date.localeCompare(a.date);
       });
-      // Deduplicate by date, keep top 3 newest
-      var seen3={}, h2hFiltered=[];
-      h2h.forEach(function(g){
-        var k = g.date||('x'+h2hFiltered.length);
-        if (!seen3[k] && h2hFiltered.length<3) { seen3[k]=true; h2hFiltered.push(g); }
-      });
-      // Build a lookup for all possible team-named keys in the response
-      // Gemini may return {veneziaScore:71, tortonaScore:89} or {teamAScore:71} or {a:71}
-      var teamAKey = null, teamBKey = null;
-      if (h2hFiltered.length > 0) {
-        var sampleKeys = Object.keys(h2hFiltered[0]);
-        // Find key containing teamA name (case-insensitive)
-        var tALow = teamA.toLowerCase().replace(/[^a-z]/g,'');
-        var tBLow = teamB.toLowerCase().replace(/[^a-z]/g,'');
-        sampleKeys.forEach(function(k){
-          var kl = k.toLowerCase().replace(/[^a-z]/g,'');
-          if (kl.includes(tALow) || kl.includes(tALow.slice(0,5))) teamAKey = k;
-          if (kl.includes(tBLow) || kl.includes(tBLow.slice(0,5))) teamBKey = k;
+      var seenH={},hf=[];
+      h2h.forEach(function(g){var k=g.date||('x'+hf.length);if(!seenH[k]&&hf.length<3){seenH[k]=true;hf.push(g);}});
+      // Dynamic team-named key lookup
+      var tAKey=null,tBKey=null;
+      if(hf.length>0){
+        var tAl=teamA.toLowerCase().replace(/[^a-z]/g,'');
+        var tBl=teamB.toLowerCase().replace(/[^a-z]/g,'');
+        Object.keys(hf[0]).forEach(function(k){
+          var kl=k.toLowerCase().replace(/[^a-z]/g,'');
+          if(kl.includes(tAl.slice(0,5))||tAl.slice(0,5).includes(kl.slice(0,4))) tAKey=k;
+          if(kl.includes(tBl.slice(0,5))||tBl.slice(0,5).includes(kl.slice(0,4))) tBKey=k;
         });
       }
-      h2hFiltered.forEach(function(g,i){
-        // Try team-named keys first, then generic teamAScore/teamBScore, then a/b
-        var a = teamAKey && g[teamAKey]!=null ? +g[teamAKey]
-              : g.teamAScore!=null ? +g.teamAScore
-              : g.a!=null ? +g.a : null;
-        var b = teamBKey && g[teamBKey]!=null ? +g[teamBKey]
-              : g.teamBScore!=null ? +g.teamBScore
-              : g.b!=null ? +g.b : null;
-        if (a!=null) state.h2hGames[i].a=Math.round(a);
-        if (b!=null) state.h2hGames[i].b=Math.round(b);
+      hf.forEach(function(g,i){
+        var a=tAKey&&g[tAKey]!=null?+g[tAKey]:g.teamAScore!=null?+g.teamAScore:g.a!=null?+g.a:null;
+        var b=tBKey&&g[tBKey]!=null?+g[tBKey]:g.teamBScore!=null?+g.teamBScore:g.b!=null?+g.b:null;
+        if(a!=null) state.h2hGames[i].a=Math.round(a);
+        if(b!=null) state.h2hGames[i].b=Math.round(b);
       });
     }
-    buildInputUI(); buildH2HUI(); saveState();
+    buildInputUI();buildH2HUI();saveState();
 
-    // ── CALL 2: Box stats (FGA, 3PA, defFgPct, assists) ───────
-    var r2 = await callGemini(key, buildStatsPrompt(teamA,teamB,gA,gB,today),
-      'Step 2/2 — fetching FGA, 3PA, FG%, assists from ESPN/SofaScore...', true);
+    // ── CALL 2: Box stats per game ────────────────────────────
+    var r2=await callGemini(key,buildStatsPrompt(teamA,teamB,gA,gB,today),'Step 2/2 — fetching FGA, 3PA, FG%, Assists from SofaScore…',true);
+    console.log('Stats raw:',r2.text);
+    var box=parseStatsJson(r2.text);
 
-    console.log('Stats raw:', r2.text);
-    var box = parseStatsJson(r2.text);
-
-    function applyBox(arr, stateGames, stateDef) {
-      if (!arr||!arr.length) return;
+    // Apply box stats: fga, tpa, defFgPct (calculate from fgm/fga if missing), assistsAllowed
+    function applyBox(arr,sg,sd){
+      if(!arr||!arr.length) return;
       arr.slice(0,3).forEach(function(g,i){
-        if (g.fga!=null&&+g.fga>0) stateGames[i].fga=Math.round(+g.fga);
-        if (g.tpa!=null&&+g.tpa>0) stateGames[i].tpa=Math.round(+g.tpa);
-        if (g.defFgPct!=null&&+g.defFgPct>0)
-          stateDef[i].fgPct=parseFloat((+g.defFgPct).toFixed(2));
-        if (g.assistsAllowed!=null&&+g.assistsAllowed>0)
-          stateDef[i].ast=Math.round(+g.assistsAllowed);
+        if(g.fga!=null&&+g.fga>0)  sg[i].fga=Math.round(+g.fga);
+        if(g.tpa!=null&&+g.tpa>0)  sg[i].tpa=Math.round(+g.tpa);
+        // Compute defFgPct: use direct value OR calculate from fgm/fga
+        var dp=null;
+        if(g.defFgPct!=null&&+g.defFgPct>0) dp=parseFloat((+g.defFgPct).toFixed(2));
+        if(!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0) dp=parseFloat((+g.oppFgm/+g.oppFga).toFixed(2));
+        if(dp) sd[i].fgPct=dp;
+        if(g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
       });
     }
-    if (box&&box.gamesA) applyBox(box.gamesA, state.gamesA, state.defA);
-    if (box&&box.gamesB) applyBox(box.gamesB, state.gamesB, state.defB);
+    if(box&&box.gamesA) applyBox(box.gamesA,state.gamesA,state.defA);
+    if(box&&box.gamesB) applyBox(box.gamesB,state.gamesB,state.defB);
 
-    // Estimate any still-missing def stats from oppScore
-    [state.gamesA, state.gamesB].forEach(function(games, ti) {
-      var def = ti===0 ? state.defA : state.defB;
-      games.forEach(function(g,i){
-        if (g.os && g.os>0) {
-          if (!def[i].fgPct||def[i].fgPct===0) {
-            var est = estimateDefStats(g.os);
-            def[i].fgPct = est.fgPct;
-          }
-          if (!def[i].ast||def[i].ast===0) {
-            var est2 = estimateDefStats(g.os);
-            def[i].ast = est2.ast;
-          }
+    // Estimate anything still missing from oppScore
+    [[state.gamesA,state.defA],[state.gamesB,state.defB]].forEach(function(pair){
+      pair[0].forEach(function(g,i){
+        if(g.os&&g.os>0){
+          if(!pair[1][i].fgPct||pair[1][i].fgPct===0){var e=estimateDefStats(g.os);pair[1][i].fgPct=e.fgPct;}
+          if(!pair[1][i].ast||pair[1][i].ast===0){var e2=estimateDefStats(g.os);pair[1][i].ast=e2.ast;}
         }
       });
     });
 
-    // Build status
-    var filled=[], warnings=[];
+    // Build status summary
+    var filled=[],warnings=[];
     filled.push(teamA+': '+gA.length+' games');
     filled.push(teamB+': '+gB.length+' games');
     var h2hN=state.h2hGames.filter(function(g){return g.a!==null;}).length;
-    if (h2hN>0) filled.push('H2H: '+h2hN+'/3');
+    if(h2hN>0) filled.push('H2H: '+h2hN+'/3');
     else warnings.push('No H2H found — fill manually');
-    var defAReal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
-    var defBReal=box&&box.gamesB?box.gamesB.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
-    var fgaAReal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.fga!=null;}).length:0;
-    if (defAReal>0) filled.push(teamA+' def: '+defAReal+'/3 real');
-    else warnings.push(teamA+' def stats estimated — verify on SofaScore');
-    if (defBReal>0) filled.push(teamB+' def: '+defBReal+'/3 real');
-    else warnings.push(teamB+' def stats estimated — verify on SofaScore');
-    if (fgaAReal>0) filled.push('FGA/3PA: found');
-    var srcs=[r1.model];
-    if (scores.sources) srcs=srcs.concat(scores.sources.filter(function(s){return s!==r1.model;}));
-    filled.push('Sources: '+srcs.join(', '));
+    var defAreal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var defBreal=box&&box.gamesB?box.gamesB.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var fgaA=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.fga!=null;}).length:0;
+    if(fgaA>0) filled.push('FGA/3PA: '+fgaA+'/3 found');
+    else warnings.push('FGA/3PA not found — may need manual entry');
+    if(defAreal>0) filled.push(teamA+' FG% & assists: '+defAreal+'/3 real');
+    else warnings.push(teamA+' FG%/assists estimated');
+    if(defBreal>0) filled.push(teamB+' FG% & assists: '+defBreal+'/3 real');
+    else warnings.push(teamB+' FG%/assists estimated');
+    filled.push('Source: '+r1.model);
 
-    buildInputUI(); buildH2HUI(); checkDataCompleteness(); saveState(); markAutofilled();
-    var q=warnings.length===0?'success':'partial';
+    buildInputUI();buildH2HUI();checkDataCompleteness();saveState();markAutofilled();
+    var q=warnings.filter(function(w){return w.indexOf('not found')!==-1&&w.indexOf('H2H')===-1;}).length?'failed':warnings.length===0?'success':'partial';
     showFetchStatus(q,
-      q==='success'?'\u2713 '+teamA+' vs '+teamB+' fully filled!'
-      :'\u29d6 '+teamA+' vs '+teamB+' filled. Check warnings.',
-      filled, warnings);
+      q==='success'?'\u2713 '+teamA+' vs '+teamB+' fully filled!':
+      q==='partial'?'\u29d6 '+teamA+' vs '+teamB+' filled — some stats estimated':
+      '\u2715 Limited data — fill missing fields manually',
+      filled,warnings);
 
   } catch(e) {
-    var isQuota=e.isQuota||(e.message&&e.message.toLowerCase().includes('quota'));
-    showFetchStatus('failed',
-      isQuota?'Quota exceeded. Wait ~1 min and retry.':'Error: '+e.message,
-      [],[]);
-    console.error('Gemini autofill error:', e);
+    var isQ=e.isQuota||(e.message&&e.message.toLowerCase().includes('quota'));
+    showFetchStatus('failed',isQ?'Quota exceeded — wait ~1 min and retry':'Error: '+e.message,[],[]);
+    console.error('Gemini autofill error:',e);
   } finally {
-    if (btn) btn.disabled=false;
-    if (sp)  sp.style.display='none';
+    if(btn) btn.disabled=false;
+    if(sp)  sp.style.display='none';
   }
 }
 
 // ── Keep claudeAutofill as alias for backwards compat ─────────
 async function claudeAutofill() { return geminiAutofill(); }
+
 
 
 // modal close on overlay tap — handled in main DOMContentLoaded below
