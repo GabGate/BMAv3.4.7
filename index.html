@@ -2569,36 +2569,28 @@ function parseStatsJson(text) {
 
 // ── Prompt 1: Scores + H2H ────────────────────────────────────
 function buildScoresPrompt(teamA, teamB, today) {
-  return [
-    'Basketball data lookup. Today: ' + today + '.',
-    'Search SofaScore, Flashscore, ESPN for COMPLETED games (FT = Full Time only).',
+  var lines = [
+    'Basketball data lookup. Today is ' + today + '.',
+    'Search SofaScore.com and Flashscore.com for COMPLETED basketball results.',
     '',
     '=== TASK 1: Last 3 completed games for ' + teamA + ' ===',
-    'Search: ' + teamA + ' basketball results site:sofascore.com OR site:flashscore.com',
-    'Go to their results page. List all FT games sorted by date newest first.',
-    'Take the 3 MOST RECENT completed games before ' + today + '.',
-    'Include games vs ANY opponent (not only ' + teamB + ').',
-    'Do NOT skip the most recent game. Index 0 must be the very latest completed game.',
-    '',
-    'For each game return:',
-    '  date: YYYY-MM-DD',
-    '  opponent: the other team name',
-    '  teamScore: ' + teamA + ' final score (integer)',
-    '  oppScore: opponent final score (integer)',
-    '  home: true if ' + teamA + ' was the home team, false if away',
+    'Go to: https://www.sofascore.com/team/basketball/' + teamA.toLowerCase().replace(/\s+/g,'-') + '/',
+    'OR search Google: "' + teamA + ' basketball results ' + today.slice(0,7) + ' site:sofascore.com"',
+    'List all completed (FT = Full Time) games sorted newest first.',
+    'Return ONLY the 3 most recent completed games that happened BEFORE ' + today + '.',
+    'IMPORTANT: include games vs ANY opponent — do not restrict to one opponent.',
+    'CRITICAL: index 0 must be the MOST RECENT game. Do not skip the latest game.',
     '',
     '=== TASK 2: Last 3 completed games for ' + teamB + ' ===',
-    'Same process — separate search for ' + teamB + ' results.',
-    'Take the 3 MOST RECENT completed games before ' + today + '.',
-    'Do NOT skip the most recent game.',
+    'Same — separate search for ' + teamB + ' results. Index 0 = most recent.',
     '',
-    '=== TASK 3: H2H — direct meetings between ' + teamA + ' AND ' + teamB + ' only ===',
-    'Search: ' + teamA + ' vs ' + teamB + ' h2h basketball sofascore',
-    'Find up to 3 most recent completed direct matchups.',
-    'teamAScore = points scored BY ' + teamA + ' (regardless of home/away)',
-    'teamBScore = points scored BY ' + teamB + ' (regardless of home/away)',
+    '=== TASK 3: H2H — direct meetings ' + teamA + ' vs ' + teamB + ' only ===',
+    'Search: "' + teamA + ' ' + teamB + ' h2h basketball" on sofascore.com',
+    'Return up to 3 most recent completed direct matchups, newest first.',
+    'For H2H: teamAScore = points scored BY ' + teamA + ' (regardless of home/away)',
+    '         teamBScore = points scored BY ' + teamB + ' (regardless of home/away)',
     '',
-    'Return ONLY raw JSON, no markdown:',
+    'Return ONLY raw JSON — no markdown, no text outside the JSON:',
     '{',
     '  "gamesA":[',
     '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":84,"oppScore":74,"home":true},',
@@ -2616,8 +2608,10 @@ function buildScoresPrompt(teamA, teamB, today) {
     '    {"date":"YYYY-MM-DD","teamAScore":87,"teamBScore":75}',
     '  ],',
     '  "sources":["SofaScore"]',
-    '}'
-  ].join('\n');
+    '}',
+    'RULES: real scores only, newest first, any competition or league counts.'
+  ];
+  return lines.join('\n');
 }
 
 // ── Prompt 2: Box stats (FGA, 3PA, FGM, FG%, Assists) ────────
@@ -2625,75 +2619,78 @@ function buildStatsPrompt(teamA, teamB, gA, gB, today) {
   var lines = [
     'Basketball statistics extractor. Today: ' + today + '.',
     '',
-    'Find the SofaScore Statistics tab (or ESPN/Flashscore box score) for each game below.',
-    'Extract the SHOOTING statistics for the named team.',
+    'Find SHOOTING STATS for each game listed below.',
+    'Use SofaScore Statistics tab as primary source. ESPN/Flashscore box score as backup.',
     '',
-    '== SOFASCORE STATISTICS TAB — how to read it ==',
-    'Left column = HOME team. Right column = AWAY team.',
+    '== SOFASCORE STATISTICS TAB LAYOUT ==',
+    'The Statistics tab shows: LEFT column = HOME team, RIGHT column = AWAY team.',
     '',
-    'Row "Field goals":  HomeFGM/HomeFGA  Home%  Field goals  Away%  AwayFGM/AwayFGA',
-    'Row "3 pointers":   HomeFGM/Home3PA  Home%  3 pointers   Away%  AwayFGM/Away3PA',
-    'Row "Assists":      HomeAST          Assists              AwayAST',
+    'Rows you need:',
+    '  "Field goals"  →  HomeFGM/HomeFGA  Home%  Field goals  Away%  AwayFGM/AwayFGA',
+    '  "3 pointers"   →  HomeFGM/Home3PA  Home%  3 pointers   Away%  AwayFGM/Away3PA',
+    '  "Assists"      →  HomeAST  Assists  AwayAST',
     '',
-    'VERIFIED EXAMPLE from Tortona(HOME) 82-71 Venezia(AWAY) on 22/05/2026:',
-    '  30/65  46%  Field goals  37%  22/60',
-    '  9/25   36%  3 pointers   23%   6/26',
-    '  15     Assists            7',
+    'VERIFIED REAL EXAMPLE (Tortona HOME 82 - Venezia AWAY 71, 22/05/2026):',
+    '  30/65  46%  Field goals  37%  22/60   ← Tortona: FGM=30,FGA=65 | Venezia: FGM=22,FGA=60',
+    '   9/25  36%  3 pointers   23%   6/26   ← Tortona: 3PA=25       | Venezia: 3PA=26',
+    '  15     Assists            7            ← Tortona assists=15    | Venezia assists=7',
     '',
-    'From this: Tortona(HOME/LEFT): FGM=30,FGA=65,3PA=25,FG%=46%,oppFG%=37%,oppAST=7',
-    '           Venezia(AWAY/RIGHT): FGM=22,FGA=60,3PA=26,FG%=37%,oppFG%=46%,oppAST=15',
+    'For Tortona (HOME/LEFT): fga=65, tpa=25, defFgPct=22/60=0.37, assistsAllowed=7',
+    'For Venezia (AWAY/RIGHT): fga=60, tpa=26, defFgPct=30/65=0.46, assistsAllowed=15',
     '',
     'EXTRACTION RULES:',
-    '  fgm = FGM of THE NAMED TEAM (their made field goals)',
     '  fga = FGA of THE NAMED TEAM (denominator of their Field goals fraction)',
     '  tpa = 3PA of THE NAMED TEAM (denominator of their 3 pointers fraction)',
-    '  defFgPct = OPPONENT FG% as 2-decimal (37% -> 0.37). This is opponent made/attempted.',
+    '  fgm = FGM of THE NAMED TEAM (numerator of their Field goals fraction)',
+    '  oppFgm = FGM of OPPONENT (numerator of opponent Field goals fraction)',
+    '  oppFga = FGA of OPPONENT (denominator of opponent Field goals fraction)',
+    '  defFgPct = oppFgm / oppFga (e.g. 22/60 = 0.37). Always 2 decimal places.',
     '  assistsAllowed = OPPONENT assists number',
-    '  IF defFgPct not found: calculate as oppFGM/oppFGA (e.g. 22/60 = 0.37)',
-    '  IF fga found but defFgPct not found: it MUST be calculable from the page.',
-    '  Named team is HOME use LEFT column. Named team is AWAY use RIGHT column.',
+    '  HOME team = LEFT column, AWAY team = RIGHT column.',
     ''
   ];
 
   gA.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    var side = g.home === true ? 'HOME → use LEFT column' : g.home === false ? 'AWAY → use RIGHT column' : 'check page';
+    var side = g.home === true ? 'HOME (LEFT column)' : g.home === false ? 'AWAY (RIGHT column)' : 'verify on page';
     lines.push('--- GAME A' + (i+1) + ' ---');
-    lines.push('Named team: ' + teamA + ' (' + side + ')');
-    lines.push('Opponent:   ' + opp);
-    lines.push('Date: ' + (g.date||'?') + ' | Score: ' + teamA + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
-    lines.push('Search: "' + teamA + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' statistics sofascore');
-    lines.push('Extract: fgm, fga, tpa for ' + teamA + '; defFgPct and assistsAllowed for ' + opp);
+    lines.push(teamA + ' was ' + side + ' vs ' + opp);
+    lines.push('Date: ' + (g.date||'?') + ' | Final: ' + teamA + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: sofascore ' + teamA + ' ' + opp + ' basketball ' + (g.date||'').replace(/-/g,' '));
+    lines.push('Navigate to Statistics tab. Extract for ' + teamA + ':');
+    lines.push('  fgm, fga, tpa (from ' + teamA + ' column), oppFgm, oppFga, assistsAllowed (from ' + opp + ' column)');
+    lines.push('  Then compute: defFgPct = oppFgm / oppFga');
     lines.push('');
   });
 
   gB.forEach(function(g, i) {
     var opp = g.opponent || 'opponent';
-    var side = g.home === true ? 'HOME → use LEFT column' : g.home === false ? 'AWAY → use RIGHT column' : 'check page';
+    var side = g.home === true ? 'HOME (LEFT column)' : g.home === false ? 'AWAY (RIGHT column)' : 'verify on page';
     lines.push('--- GAME B' + (i+1) + ' ---');
-    lines.push('Named team: ' + teamB + ' (' + side + ')');
-    lines.push('Opponent:   ' + opp);
-    lines.push('Date: ' + (g.date||'?') + ' | Score: ' + teamB + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
-    lines.push('Search: "' + teamB + '" "' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' statistics sofascore');
-    lines.push('Extract: fgm, fga, tpa for ' + teamB + '; defFgPct and assistsAllowed for ' + opp);
+    lines.push(teamB + ' was ' + side + ' vs ' + opp);
+    lines.push('Date: ' + (g.date||'?') + ' | Final: ' + teamB + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+    lines.push('Search: sofascore ' + teamB + ' ' + opp + ' basketball ' + (g.date||'').replace(/-/g,' '));
+    lines.push('Navigate to Statistics tab. Extract for ' + teamB + ':');
+    lines.push('  fgm, fga, tpa (from ' + teamB + ' column), oppFgm, oppFga, assistsAllowed (from ' + opp + ' column)');
+    lines.push('  Then compute: defFgPct = oppFgm / oppFga');
     lines.push('');
   });
 
-  lines.push('Return ONLY raw JSON, no markdown:');
+  lines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
   lines.push('{');
   lines.push('  "gamesA":[');
-  lines.push('    {"fgm":30,"fga":65,"tpa":25,"defFgPct":0.37,"assistsAllowed":7},');
-  lines.push('    {"fgm":28,"fga":70,"tpa":28,"defFgPct":0.44,"assistsAllowed":21},');
-  lines.push('    {"fgm":26,"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
+  lines.push('    {"fgm":30,"fga":65,"tpa":25,"oppFgm":22,"oppFga":60,"defFgPct":0.37,"assistsAllowed":7},');
+  lines.push('    {"fgm":28,"fga":70,"tpa":28,"oppFgm":29,"oppFga":66,"defFgPct":0.44,"assistsAllowed":21},');
+  lines.push('    {"fgm":26,"fga":68,"tpa":23,"oppFgm":28,"oppFga":68,"defFgPct":0.41,"assistsAllowed":17}');
   lines.push('  ],');
   lines.push('  "gamesB":[');
-  lines.push('    {"fgm":22,"fga":60,"tpa":26,"defFgPct":0.46,"assistsAllowed":15},');
-  lines.push('    {"fgm":30,"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
-  lines.push('    {"fgm":27,"fga":65,"tpa":21,"defFgPct":0.48,"assistsAllowed":20}');
+  lines.push('    {"fgm":22,"fga":60,"tpa":26,"oppFgm":30,"oppFga":65,"defFgPct":0.46,"assistsAllowed":15},');
+  lines.push('    {"fgm":30,"fga":75,"tpa":27,"oppFgm":28,"oppFga":67,"defFgPct":0.42,"assistsAllowed":18},');
+  lines.push('    {"fgm":27,"fga":65,"tpa":21,"oppFgm":31,"oppFga":67,"defFgPct":0.46,"assistsAllowed":20}');
   lines.push('  ],');
   lines.push('  "sources":["SofaScore"]');
   lines.push('}');
-  lines.push('defFgPct: 2 decimal max. If not on page, compute oppFGM/oppFGA. Never leave null if fga is found.');
+  lines.push('CRITICAL: defFgPct = oppFgm/oppFga computed to 2 decimal places. Never leave null if fga found.');
   return lines.join('\n');
 }
 
@@ -2888,10 +2885,14 @@ async function geminiAutofill() {
       arr.slice(0,3).forEach(function(g,i){
         if(g.fga!=null&&+g.fga>0)  sg[i].fga=Math.round(+g.fga);
         if(g.tpa!=null&&+g.tpa>0)  sg[i].tpa=Math.round(+g.tpa);
-        // Compute defFgPct: use direct value OR calculate from fgm/fga
+        // defFgPct: prefer direct value, then calculate from oppFgm/oppFga, then from fgm+fga (this team's opponent)
         var dp=null;
-        if(g.defFgPct!=null&&+g.defFgPct>0) dp=parseFloat((+g.defFgPct).toFixed(2));
-        if(!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0) dp=parseFloat((+g.oppFgm/+g.oppFga).toFixed(2));
+        if(g.defFgPct!=null&&+g.defFgPct>0&&+g.defFgPct<1)
+          dp=parseFloat((+g.defFgPct).toFixed(2));
+        if(!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0)
+          dp=parseFloat((+g.oppFgm/+g.oppFga).toFixed(2));
+        // Cap to sane range
+        if(dp&&(dp<0.2||dp>0.75)) dp=null;
         if(dp) sd[i].fgPct=dp;
         if(g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
       });
