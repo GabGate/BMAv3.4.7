@@ -2551,318 +2551,253 @@ function markAutofilled() {
 // ── Prompt 1: scores + dates (easy to find, always works) ────
 function buildScoresPrompt(teamA, teamB, today) {
   return [
-    'You are a basketball stats assistant. Today is ' + today + '.',
+    'You are a basketball data assistant. Today is ' + today + '.',
     '',
-    'STEP 1: Search Google for: ' + teamA + ' basketball results ' + today.slice(0,7),
-    'Go to SofaScore or Flashscore results/fixtures page for ' + teamA + '.',
-    'List ALL completed games (FT = Full Time) ordered by date, most recent first.',
-    'Pick the TOP 3 completed games with a final score BEFORE today ' + today + '.',
-    'IGNORE any game that is upcoming, live, or cancelled.',
+    'Search multiple sources (SofaScore, Flashscore, ESPN, LiveScore, basketball-reference)',
+    'to find completed basketball game results.',
     '',
-    'STEP 2: Search Google for: ' + teamB + ' basketball results ' + today.slice(0,7),
-    'Same process — pick the 3 most recent completed games for ' + teamB + '.',
+    '=== TASK A: Last 3 completed games for ' + teamA + ' ===',
+    'Search: "' + teamA + ' basketball results" site:sofascore.com OR site:flashscore.com OR site:espn.com',
+    'Find the 3 most recent completed games (FT = full time) with real final scores.',
+    'Date must be on or before ' + today + '. Exclude upcoming, live, postponed, or cancelled games.',
     '',
-    'STEP 3: Search Google for: ' + teamA + ' vs ' + teamB + ' basketball h2h history',
-    'Find direct meetings between these two teams. List up to 3 most recent completed H2H games.',
-    'Skip cancelled games.',
+    '=== TASK B: Last 3 completed games for ' + teamB + ' ===',
+    'Same as above for ' + teamB + '.',
     '',
-    'CRITICAL RULES:',
-    '- Every game MUST have a real final score (two numbers, e.g. 84-74)',
-    '- Date format: YYYY-MM-DD',
-    '- opponent: the other team name',
-    '- teamScore: ' + teamA + ' or ' + teamB + ' score',
-    '- oppScore: the opponent score in that game',
-    '- For h2hGames: teamAScore = ' + teamA + ' score, teamBScore = ' + teamB + ' score',
-    '- Sort each array newest-first (index 0 = most recent)',
+    '=== TASK C: H2H — direct meetings between ' + teamA + ' AND ' + teamB + ' ===',
+    'Search: "' + teamA + '" "' + teamB + '" basketball h2h OR "head to head"',
+    'Find ALL completed direct meetings between these two specific teams.',
+    'Sort by date descending. Return the 3 most recent. If fewer than 3 exist, return however many exist.',
+    'IMPORTANT: Both scores must appear. Skip any game without a final score.',
     '',
-    'Return ONLY raw JSON. No markdown. No explanation. Start with { end with }:',
-    '{"gamesA":[',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":84,"oppScore":74},',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":91,"oppScore":80},',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":78,"oppScore":82}',
-    '],"gamesB":[',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":88,"oppScore":76},',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":95,"oppScore":89},',
-    '  {"date":"YYYY-MM-DD","opponent":"Real Opponent Name","teamScore":82,"oppScore":85}',
-    '],"h2hGames":[',
-    '  {"date":"YYYY-MM-DD","teamAScore":85,"teamBScore":80},',
-    '  {"date":"YYYY-MM-DD","teamAScore":78,"teamBScore":82},',
-    '  {"date":"YYYY-MM-DD","teamAScore":90,"teamBScore":88}',
-    '],"sources":["SofaScore"]}'
+    'RETURN FORMAT — raw JSON only, no markdown, no explanation:',
+    '{',
+    '  "gamesA": [',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":84,"oppScore":74},',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":91,"oppScore":80},',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":78,"oppScore":82}',
+    '  ],',
+    '  "gamesB": [',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":88,"oppScore":76},',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":95,"oppScore":89},',
+    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":82,"oppScore":85}',
+    '  ],',
+    '  "h2hGames": [',
+    '    {"date":"YYYY-MM-DD","teamAScore":104,"teamBScore":91},',
+    '    {"date":"YYYY-MM-DD","teamAScore":89,"teamBScore":100},',
+    '    {"date":"YYYY-MM-DD","teamAScore":73,"teamBScore":98}',
+    '  ],',
+    '  "sources": ["SofaScore"]',
+    '}',
+    'Rules: sort each array newest-first. Use real verified scores only — no guesses.'
   ].join('\n');
 }
 
-// ── Prompt 2: statistics tab data for one specific game ───────
-// SofaScore Statistics tab layout (as seen on screenshot):
-//   Left team | Stat name | Right team
-//   13/21  62%  Free throws  95%  20/21
-//   25/44  57%  2 pointers   44%  18/41
-//    7/26  27%  3 pointers   26%   6/23
-//   32/70  46%  Field goals  38%  24/64   <-- FGA = denominator (70 and 64)
-//   15          Assists      14           <-- assistsAllowed for each side
-// defFgPct for team A = RIGHT team Field goals % (38% = 0.38 above)
-// defFgPct for team B = LEFT team Field goals % (46% = 0.46 above)
-function buildStatsPrompt(teamA, teamB, teamAOpponent, teamBOpponent, dateA, dateB, today) {
+function buildStatsPrompt(teamA, teamB, gA, gB, today) {
   var lines = [
-    'Today is ' + today + '. Basketball statistics lookup.',
+    'You are a basketball statistics extractor. Today: ' + today + '.',
     '',
-    'I need the STATISTICS TAB data from SofaScore for TWO specific games.',
-    'The Statistics tab on SofaScore shows shooting splits like this:',
-    '  Left%  Free throws  Right%',
-    '  Left%  2 pointers   Right%',
-    '  Left%  3 pointers   Right%',
-    '  LeftFGM/LeftFGA  Left%  Field goals  Right%  RightFGM/RightFGA',
-    '  LeftNum  Assists  RightNum',
+    'I need SHOOTING STATS for 6 specific basketball games.',
+    'Search multiple sources: SofaScore, ESPN box scores, basketball-reference, Flashscore.',
     '',
-    '--- GAME 1 ---',
-    teamA + ' vs ' + teamAOpponent + ' on ' + dateA,
-    'Search: site:sofascore.com "' + teamA + '" "' + teamAOpponent + '" statistics',
-    'From the Statistics tab, extract for ' + teamA + ':',
-    '  fga_A: the DENOMINATOR of ' + teamA + "'s Field goals fraction (e.g. 32/70 → fga=70)",
-    '  tpa_A: the DENOMINATOR of ' + teamA + "'s 3 pointers fraction (e.g. 7/26 → tpa=26)",
-    '  defFgPct_A: the Field goals PERCENTAGE of ' + teamAOpponent + ' (the opponent) as decimal (e.g. 38% → 0.38)',
-    '  assistsAllowed_A: the Assists number for ' + teamAOpponent + ' (opponent assists)',
+    '== HOW TO READ SOFASCORE STATISTICS TAB ==',
+    'Layout (Left team | Stat label | Right team):',
+    '  FGM/FGA   FG%   Field goals   FG%   FGM/FGA',
+    '  FGM/FGA   FG%   3 pointers    FG%   FGM/FGA',
+    '            Num   Assists       Num',
     '',
-    '--- GAME 2 ---',
-    teamB + ' vs ' + teamBOpponent + ' on ' + dateB,
-    'Search: site:sofascore.com "' + teamB + '" "' + teamBOpponent + '" statistics',
-    'From the Statistics tab, extract for ' + teamB + ':',
-    '  fga_B: the DENOMINATOR of ' + teamB + "'s Field goals fraction",
-    '  tpa_B: the DENOMINATOR of ' + teamB + "'s 3 pointers fraction",
-    '  defFgPct_B: the Field goals PERCENTAGE of ' + teamBOpponent + ' (the opponent) as decimal',
-    '  assistsAllowed_B: the Assists number for ' + teamBOpponent,
+    'Example (from a real game screenshot):',
+    '  32/64  50%  Field goals  39%  25/64',
+    '  13/25  52%  3 pointers   35%   9/26',
+    '  23     Assists           18',
     '',
-    'Return ONLY raw JSON — no markdown, no text outside the braces:',
-    '{"gameA":{"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},',
-    ' "gameB":{"fga":74,"tpa":24,"defFgPct":0.44,"assistsAllowed":19}}'
+    'From this example, for the LEFT team:',
+    '  fga = 64 (denominator of their Field goals fraction)',
+    '  tpa = 25 (denominator of their 3 pointers fraction)',
+    '  defFgPct = 0.39 (RIGHT team Field goals %, converted to decimal)',
+    '  assistsAllowed = 18 (RIGHT team Assists number)',
+    '',
+    'For the RIGHT team:',
+    '  fga = 64, tpa = 26, defFgPct = 0.50, assistsAllowed = 23',
+    '',
+    'IMPORTANT: defFgPct is the OPPONENT percentage, not this team percentage.',
+    'assistsAllowed is the OPPONENT assists count.',
+    ''
   ];
+
+  gA.forEach(function(g, i) {
+    var opp = g.opponent || 'opponent';
+    lines.push('--- GAME A' + (i+1) + ' ---');
+    lines.push('Team: ' + teamA + '  vs  ' + opp);
+    lines.push('Date: ' + (g.date||'recent') + '  Final score: ' + g.teamScore + '-' + g.oppScore);
+    lines.push('Search ESPN/SofaScore/Flashscore for this exact game box score / statistics tab.');
+    lines.push('Extract FOR ' + teamA + ':');
+    lines.push('  fga = ' + teamA + ' total field goal attempts (FGA denominator)');
+    lines.push('  tpa = ' + teamA + ' total 3-point attempts (3PA denominator)');
+    lines.push('  defFgPct = ' + opp + ' field goal % as decimal (e.g. 38% = 0.38)');
+    lines.push('  assistsAllowed = ' + opp + ' total assists in this game');
+    lines.push('');
+  });
+
+  gB.forEach(function(g, i) {
+    var opp = g.opponent || 'opponent';
+    lines.push('--- GAME B' + (i+1) + ' ---');
+    lines.push('Team: ' + teamB + '  vs  ' + opp);
+    lines.push('Date: ' + (g.date||'recent') + '  Final score: ' + g.teamScore + '-' + g.oppScore);
+    lines.push('Search ESPN/SofaScore/Flashscore for this exact game box score / statistics tab.');
+    lines.push('Extract FOR ' + teamB + ':');
+    lines.push('  fga = ' + teamB + ' total field goal attempts');
+    lines.push('  tpa = ' + teamB + ' total 3-point attempts');
+    lines.push('  defFgPct = ' + opp + ' field goal % as decimal');
+    lines.push('  assistsAllowed = ' + opp + ' total assists in this game');
+    lines.push('');
+  });
+
+  lines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
+  lines.push('{');
+  lines.push('  "gamesA":[');
+  lines.push('    {"fga":64,"tpa":25,"defFgPct":0.39,"assistsAllowed":18},');
+  lines.push('    {"fga":70,"tpa":28,"defFgPct":0.44,"assistsAllowed":21},');
+  lines.push('    {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
+  lines.push('  ],');
+  lines.push('  "gamesB":[');
+  lines.push('    {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":19},');
+  lines.push('    {"fga":75,"tpa":27,"defFgPct":0.42,"assistsAllowed":22},');
+  lines.push('    {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":20}');
+  lines.push('  ],');
+  lines.push('  "sources":["SofaScore","ESPN"]');
+  lines.push('}');
+  lines.push('Use null for stats you cannot find after searching. Do not estimate or invent values.');
   return lines.join('\n');
 }
 
-// ── Legacy single-prompt fallback ─────────────────────────────
 function buildGeminiPrompt(teamA, teamB, today) {
   return buildScoresPrompt(teamA, teamB, today);
 }
 
-// ── Parse JSON from response ──────────────────────────────────
-function parseStatsJson(text) {
-  if (!text) return null;
-
-  // Gemini with search grounding sometimes returns two JSON blocks concatenated.
-  // Strategy: strip fences, find ALL {...} candidates, try largest-first, pick
-  // the one that has the expected shape (gamesA / gamesB keys).
-
-  // 1. Strip all markdown code fences
-  let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-
-  // 2. Collect every top-level {...} block by scanning for balanced braces
-  const candidates = [];
-  let depth = 0, start = -1;
-  for (let i = 0; i < clean.length; i++) {
-    if (clean[i] === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (clean[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        candidates.push(clean.slice(start, i + 1));
-        start = -1;
-      }
-    }
-  }
-
-  // 3. Sort largest first (the full stats object is the biggest block)
-  candidates.sort(function(a, b) { return b.length - a.length; });
-
-  // 4. Return the first one that parses AND has gamesA or gamesB
-  for (var i = 0; i < candidates.length; i++) {
-    try {
-      var obj = JSON.parse(candidates[i]);
-      if (obj && (obj.gamesA || obj.gamesB)) return obj;
-    } catch(_) {}
-  }
-
-  // 5. Fallback: return any parseable object
-  for (var j = 0; j < candidates.length; j++) {
-    try { return JSON.parse(candidates[j]); } catch(_) {}
-  }
-
-  return null;
+function estimateDefStats(os) {
+  if (!os || os <= 0) return { fgPct: null, ast: null };
+  // Use FG% = oppScore / (oppScore + ftEstimate) / avgFgaRatio
+  // Simpler calibrated estimate: median NBA/EuroLeague ~0.46 FG%
+  // Adjust: high-scoring games trend slightly higher FG%
+  var fgPct = parseFloat(Math.min(0.54, Math.max(0.36, 0.435 + (os - 80) * 0.001)).toFixed(2));
+  // Assists: ~1 per 4.5 pts in European leagues, ~1 per 5 pts NBA
+  var ast = Math.round(Math.min(30, Math.max(12, os / 4.7)));
+  return { fgPct: fgPct, ast: ast };
 }
 
-// ── Apply stats to state (index 0 = most recent) ──────────────
 function applyStats(stats, teamA, teamB) {
-  const filled = [], warnings = [];
+  var filled = [], warnings = [];
 
-  // Sort games most-recent-first by date in gameLabel
   function sortGames(arr) {
     if (!arr || !arr.length) return arr;
     var dated = arr.map(function(g) {
-      var m = (g.gameLabel || '').match(/(\d{4}-\d{2}-\d{2})/);
+      var m = (g.gameLabel || g.date || '').match(/(\d{4}-\d{2}-\d{2})/);
       return { g: g, date: m ? m[1] : null };
     });
-    var hasDates = dated.filter(function(d) { return d.date; }).length >= 2;
-    if (hasDates) {
+    if (dated.filter(function(d){ return d.date; }).length >= 2) {
       dated.sort(function(a, b) {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
+        if (!a.date) return 1; if (!b.date) return -1;
         return b.date.localeCompare(a.date);
       });
     }
-    return dated.map(function(d) { return d.g; });
+    return dated.map(function(d){ return d.g; });
   }
 
-  // Estimate defensive stats from oppScore when box score data unavailable.
-  // defFgPct: oppScore / (oppScore / leagueAvgFgPct) — rearranged:
-  //   league avg FGA ≈ oppScore / leagueAvgFgPct / 2  (accounting for FTs)
-  //   simpler: defFgPct ≈ oppScore / (oppScore + 38) capped 0.38–0.54
-  //   (38 is approximate pts from FT + offensive rebounds at league avg)
-  // assistsAllowed: league avg ≈ oppScore / 5.2 (rough: ~20 ast per 104 pts)
-  function estimateDefStats(oppScore) {
-    if (oppScore == null || oppScore <= 0) return { fgPct: null, ast: null };
-    // FG% estimate: points allowed correlates ~0.45 center; adjust by score
-    var fgPct = Math.min(0.54, Math.max(0.38, (oppScore - 10) / (oppScore * 2.15)));
-    fgPct = parseFloat(fgPct.toFixed(2));
-    // Assists: roughly 1 assist per 5 pts scored
-    var ast = Math.round(Math.min(32, Math.max(14, oppScore / 5.1)));
-    return { fgPct: fgPct, ast: ast };
-  }
-
-  function fillGames(gamesArr, stateGames, stateDef, teamName) {
+  function fillTeam(gamesArr, stateGames, stateDef, name) {
     var games = sortGames(gamesArr);
-    if (!games || games.length === 0) {
-      warnings.push(teamName + ' games not found — fill manually');
-      return;
-    }
-    var defFoundCount = 0;
-    var defEstCount = 0;
+    if (!games || !games.length) { warnings.push(name + ' games not found'); return; }
+    var defReal = 0, defEst = 0;
     games.slice(0, 3).forEach(function(g, i) {
-      if (g.teamScore      != null) stateGames[i].ts  = Math.round(+g.teamScore);
-      if (g.oppScore       != null) stateGames[i].os  = Math.round(+g.oppScore);
-      if (g.fga            != null) stateGames[i].fga = Math.round(+g.fga);
-      if (g.tpa            != null) stateGames[i].tpa = Math.round(+g.tpa);
-
+      if (g.teamScore != null) stateGames[i].ts = Math.round(+g.teamScore);
+      if (g.oppScore  != null) stateGames[i].os = Math.round(+g.oppScore);
+      if (g.fga != null && +g.fga > 0) stateGames[i].fga = Math.round(+g.fga);
+      if (g.tpa != null && +g.tpa > 0) stateGames[i].tpa = Math.round(+g.tpa);
       if (g.defFgPct != null && +g.defFgPct > 0) {
-        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2));
-        defFoundCount++;
+        stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2)); defReal++;
       } else {
-        // Estimate from oppScore
-        var est = estimateDefStats(g.oppScore != null ? +g.oppScore : stateGames[i].os);
-        if (est.fgPct != null) { stateDef[i].fgPct = est.fgPct; defEstCount++; }
+        var est = estimateDefStats(stateGames[i].os);
+        if (est.fgPct) { stateDef[i].fgPct = est.fgPct; defEst++; }
       }
-
       if (g.assistsAllowed != null && +g.assistsAllowed > 0) {
         stateDef[i].ast = Math.round(+g.assistsAllowed);
       } else {
-        var os = g.oppScore != null ? +g.oppScore : stateGames[i].os;
-        var estAst = estimateDefStats(os).ast;
-        if (estAst != null) stateDef[i].ast = estAst;
+        var e2 = estimateDefStats(stateGames[i].os);
+        if (e2.ast) stateDef[i].ast = e2.ast;
       }
     });
-    filled.push(teamName + ': ' + Math.min(games.length, 3) + ' games');
-    if (defFoundCount > 0) {
-      filled.push(teamName + ' def stats: ' + defFoundCount + '/3 real' + (defEstCount > 0 ? ', ' + defEstCount + ' estimated' : ''));
-    } else if (defEstCount > 0) {
-      filled.push(teamName + ' def stats: ' + defEstCount + '/3 estimated from score');
-      warnings.push(teamName + ' defensive FG% & assists estimated from score — verify on SofaScore box score');
-    }
+    filled.push(name + ': ' + Math.min(games.length, 3) + ' games');
+    if (defReal > 0) filled.push(name + ' def: ' + defReal + '/3 real');
+    else { filled.push(name + ' def: estimated'); warnings.push(name + ' FG%/assists estimated — verify on SofaScore'); }
   }
 
-  fillGames(stats.gamesA || [], state.gamesA, state.defA, teamA);
-  fillGames(stats.gamesB || [], state.gamesB, state.defB, teamB);
+  fillTeam(stats.gamesA || [], state.gamesA, state.defA, teamA);
+  fillTeam(stats.gamesB || [], state.gamesB, state.defB, teamB);
 
-  // H2H — always reset all 3 slots to null first so old data doesn't bleed in
   state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}];
-  if (stats.h2hGames && stats.h2hGames.length > 0) {
-    var h2h = stats.h2hGames.slice().sort(function(a,b) {
-      if (!a.date || !b.date) return 0;
-      return b.date.localeCompare(a.date);
+  if (stats.h2hGames && stats.h2hGames.length) {
+    var h2h = stats.h2hGames.slice().sort(function(a,b){
+      if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
     });
-    h2h.slice(0, 3).forEach(function(g, i) {
+    h2h.slice(0,3).forEach(function(g,i){
       if (g.a != null) state.h2hGames[i].a = Math.round(+g.a);
       if (g.b != null) state.h2hGames[i].b = Math.round(+g.b);
+      if (g.teamAScore != null) state.h2hGames[i].a = Math.round(+g.teamAScore);
+      if (g.teamBScore != null) state.h2hGames[i].b = Math.round(+g.teamBScore);
     });
-    filled.push('H2H: ' + Math.min(h2h.length, 3) + ' result(s) — remaining slots left blank');
-    if (h2h.length < 3) warnings.push('Only ' + h2h.length + ' H2H game(s) found — slot(s) ' + (h2h.length+1) + '-3 left blank');
-  } else {
-    warnings.push('No H2H history found — fill manually');
-  }
+    filled.push('H2H: ' + Math.min(h2h.length,3) + ' result(s)');
+    if (h2h.length < 3) warnings.push('Only ' + h2h.length + ' H2H game(s) found — remaining slots blank');
+  } else { warnings.push('No H2H history found — fill manually'); }
 
-  if (stats.dataQuality === 'estimated') warnings.push('Data quality flagged as estimated — spot-check on SofaScore');
   if (stats.sources && stats.sources.length) filled.push('Sources: ' + stats.sources.join(', '));
-
-  buildInputUI();
-  buildH2HUI();
-  checkDataCompleteness();
-  saveState();
-  markAutofilled();
-
-  var noGames = warnings.filter(function(w) { return w.indexOf('not found') !== -1 && w.indexOf('H2H') === -1; }).length > 0;
-  var q = noGames ? 'failed' : (warnings.length === 0 ? 'success' : 'partial');
-
+  buildInputUI(); buildH2HUI(); checkDataCompleteness(); saveState(); markAutofilled();
+  var q = warnings.filter(function(w){ return w.indexOf('not found') !== -1; }).length ? 'failed'
+        : warnings.length === 0 ? 'success' : 'partial';
   showFetchStatus(q,
-    q === 'success'
-      ? '&#10003; ' + teamA + ' vs ' + teamB + ' fully filled! Select League Preset below.'
-      : q === 'partial'
-      ? '&#9203; ' + teamA + ' vs ' + teamB + ' filled (some stats estimated). Review warnings.'
-      : '&#10060; Limited data. Fill missing fields manually.',
-    filled, warnings
-  );
+    q==='success' ? '\u2713 '+teamA+' vs '+teamB+' filled! Select League Preset below.'
+    : q==='partial' ? '\u29d6 '+teamA+' vs '+teamB+' filled. Some stats estimated.'
+    : '\u2715 Limited data. Fill manually.',
+    filled, warnings);
 }
 
-// ── MAIN: Gemini Autofill ─────────────────────────────────────
-// ── Shared: call Gemini with a prompt, return parsed JSON ─────
 async function callGemini(key, prompt, statusMsg, useUrlContext) {
-  const MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-  ];
+  var MODELS = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite'];
   showFetchStatus('loading', statusMsg, [], []);
+  var triedWithoutUrl = false;
 
-  async function tryModel(model) {
-    // Use both googleSearch + urlContext when available (urlContext lets Gemini
-    // actually fetch and read page content, not just search snippets)
-    var tools = useUrlContext
-      ? [{ googleSearch: {} }, { urlContext: {} }]
-      : [{ googleSearch: {} }];
+  async function tryModel(model, withUrl) {
+    var tools = withUrl ? [{googleSearch:{}},{urlContext:{}}] : [{googleSearch:{}}];
     var body = {
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{parts:[{text:prompt}]}],
       tools: tools,
-      generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
+      generationConfig: {temperature:0.0, maxOutputTokens:8192}
     };
     var res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      'https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent?key='+key,
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}
     );
     var data = await res.json();
     if (!res.ok) {
-      var msg = (data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
-      var isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
-      var isNotFound = res.status === 404 || msg.toLowerCase().includes('not found');
-      // urlContext not supported on this model — retry without it
-      var isToolErr = msg.toLowerCase().includes('urlcontext') || msg.toLowerCase().includes('url_context') || msg.toLowerCase().includes('tool');
-      throw Object.assign(new Error(msg), { isQuota, isNotFound, isToolErr });
+      var msg = (data.error && data.error.message) ? data.error.message : ('HTTP '+res.status);
+      var isQuota = res.status===429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+      var isNotFound = res.status===404 || msg.toLowerCase().includes('not found');
+      var isToolErr = msg.toLowerCase().includes('urlcontext') || msg.toLowerCase().includes('url_context') || (res.status===400 && withUrl);
+      throw Object.assign(new Error(msg), {isQuota:isQuota, isNotFound:isNotFound, isToolErr:isToolErr});
     }
-    return { data: data, model: model };
+    return {data:data, model:model};
   }
 
   var result = null, lastErr = null;
-  var triedWithout = false;
   for (var mi = 0; mi < MODELS.length; mi++) {
+    var withUrl = useUrlContext && !triedWithoutUrl;
     try {
-      result = await tryModel(MODELS[mi]);
+      result = await tryModel(MODELS[mi], withUrl);
       break;
     } catch(e) {
       lastErr = e;
-      console.warn('Model ' + MODELS[mi] + ' failed:', e.message);
-      // If urlContext caused the error, retry same model without it
-      if (e.isToolErr && useUrlContext && !triedWithout) {
-        useUrlContext = false;
-        triedWithout = true;
-        mi--; // retry same model
-        continue;
+      console.warn('Model '+MODELS[mi]+' failed:', e.message);
+      if (e.isToolErr && useUrlContext && !triedWithoutUrl) {
+        triedWithoutUrl = true; mi--; continue;
       }
       if (e.isQuota || e.isNotFound) continue;
       break;
@@ -2870,253 +2805,168 @@ async function callGemini(key, prompt, statusMsg, useUrlContext) {
   }
   if (!result) throw lastErr || new Error('All models failed.');
 
-  // Extract all text parts, deduplicate by 80-char prefix
-  var rawParts = (result.data.candidates || [])
-    .reduce(function(acc, c) { return acc.concat((c.content && c.content.parts) ? c.content.parts : []); }, [])
-    .filter(function(p) { return p.text && p.text.trim().length > 10; })
-    .map(function(p) { return p.text.trim(); });
-
-  var seen = {}, unique = [];
-  rawParts.forEach(function(t) {
-    var k = t.slice(0, 80);
-    if (!seen[k]) { seen[k] = true; unique.push(t); }
-  });
+  var rawParts = (result.data.candidates||[])
+    .reduce(function(acc,c){ return acc.concat((c.content&&c.content.parts)?c.content.parts:[]); },[])
+    .filter(function(p){ return p.text && p.text.trim().length > 10; })
+    .map(function(p){ return p.text.trim(); });
+  var seen={}, unique=[];
+  rawParts.forEach(function(t){ var k=t.slice(0,80); if(!seen[k]){seen[k]=true;unique.push(t);} });
   var text = unique.join('\n');
   if (!text) throw new Error(result.model + ' returned empty response.');
-  return { text: text, model: result.model };
+  return {text:text, model:result.model};
 }
 
 async function geminiAutofill() {
-  var teamA = (document.getElementById('claudeTeamA') ? document.getElementById('claudeTeamA').value : '').trim();
-  var teamB = (document.getElementById('claudeTeamB') ? document.getElementById('claudeTeamB').value : '').trim();
-
-  if (!teamA || !teamB) { showFetchStatus('failed', 'Enter both team names above first.', [], []); return; }
+  var teamA = (document.getElementById('claudeTeamA')||{}).value||'';
+  var teamB = (document.getElementById('claudeTeamB')||{}).value||'';
+  teamA = teamA.trim(); teamB = teamB.trim();
+  if (!teamA||!teamB) { showFetchStatus('failed','Enter both team names above first.',[],[]); return; }
 
   var key = getGeminiKey();
-  if (!key) {
-    showFetchStatus('failed', 'No Gemini API key saved. Go to Settings to add your free key from aistudio.google.com', [], []);
-    return;
-  }
+  if (!key) { showFetchStatus('failed','No Gemini API key saved. Go to Settings.',[],[]); return; }
 
-  var btn = document.getElementById('geminiAutofillBtn');
-  var sp  = document.getElementById('geminiSpinner');
-  if (btn) btn.disabled = true;
-  if (sp)  sp.style.display = 'inline-block';
+  var btn=document.getElementById('geminiAutofillBtn'), sp=document.getElementById('geminiSpinner');
+  if (btn) btn.disabled=true;
+  if (sp)  sp.style.display='inline-block';
 
-  state.teamAName = teamA; state.teamBName = teamB;
-  var tAEl = document.getElementById('teamAName'), tBEl = document.getElementById('teamBName');
-  if (tAEl) tAEl.value = teamA;
-  if (tBEl) tBEl.value = teamB;
+  state.teamAName=teamA; state.teamBName=teamB;
+  var tAEl=document.getElementById('teamAName'), tBEl=document.getElementById('teamBName');
+  if (tAEl) tAEl.value=teamA;
+  if (tBEl) tBEl.value=teamB;
 
   var today = new Date().toISOString().split('T')[0];
 
   try {
-    // ── CALL 1: Scores + dates (fast, always works) ───────────
-    var r1 = await callGemini(key, buildScoresPrompt(teamA, teamB, today),
-      'Step 1/2 — searching recent results for ' + teamA + ' & ' + teamB + '...');
+    // ── CALL 1: Scores + H2H ─────────────────────────────────
+    var r1 = await callGemini(key, buildScoresPrompt(teamA,teamB,today),
+      'Step 1/2 — searching results & H2H for '+teamA+' & '+teamB+'...');
 
     var scores = parseStatsJson(r1.text);
-    if (!scores || (!scores.gamesA && !scores.gamesB)) {
-      console.error('Scores response:', r1.text);
-      throw new Error('Could not parse scores. Raw logged to console.');
+    if (!scores||(!scores.gamesA&&!scores.gamesB)) {
+      console.error('Scores raw:', r1.text);
+      throw new Error('Could not parse scores. Check console.');
     }
 
-    // Sort each array by date descending, keep top 3
     function topThree(arr) {
-      if (!arr || !arr.length) return [];
-      return arr.slice().sort(function(a, b) {
-        if (!a.date) return 1; if (!b.date) return -1;
+      if (!arr||!arr.length) return [];
+      return arr.slice().sort(function(a,b){
+        if(!a.date) return 1; if(!b.date) return -1;
         return b.date.localeCompare(a.date);
-      }).slice(0, 3);
+      }).slice(0,3);
     }
-    var gA = topThree(scores.gamesA || []);
-    var gB = topThree(scores.gamesB || []);
+    var gA = topThree(scores.gamesA||[]);
+    var gB = topThree(scores.gamesB||[]);
 
-    // Fill scores into state immediately
-    gA.forEach(function(g, i) {
-      if (g.teamScore != null) state.gamesA[i].ts = Math.round(+g.teamScore);
-      if (g.oppScore  != null) state.gamesA[i].os = Math.round(+g.oppScore);
+    // Apply scores immediately
+    gA.forEach(function(g,i){
+      if (g.teamScore!=null) state.gamesA[i].ts=Math.round(+g.teamScore);
+      if (g.oppScore!=null)  state.gamesA[i].os=Math.round(+g.oppScore);
     });
-    gB.forEach(function(g, i) {
-      if (g.teamScore != null) state.gamesB[i].ts = Math.round(+g.teamScore);
-      if (g.oppScore  != null) state.gamesB[i].os = Math.round(+g.oppScore);
+    gB.forEach(function(g,i){
+      if (g.teamScore!=null) state.gamesB[i].ts=Math.round(+g.teamScore);
+      if (g.oppScore!=null)  state.gamesB[i].os=Math.round(+g.oppScore);
     });
 
-    // H2H
-    state.h2hGames = [{a:null,b:null},{a:null,b:null},{a:null,b:null}];
+    // Apply H2H — reset all 3 slots first
+    state.h2hGames=[{a:null,b:null},{a:null,b:null},{a:null,b:null}];
     if (scores.h2hGames && scores.h2hGames.length) {
       var h2h = scores.h2hGames.slice().sort(function(a,b){
         if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
       });
-      h2h.slice(0,3).forEach(function(g,i){
-        if (g.teamAScore != null) state.h2hGames[i].a = Math.round(+g.teamAScore);
-        if (g.teamBScore != null) state.h2hGames[i].b = Math.round(+g.teamBScore);
+      // Take TOP 3 unique H2H by date
+      var seen3={}, h2hFiltered=[];
+      h2h.forEach(function(g){
+        var k = g.date||('x'+h2hFiltered.length);
+        if (!seen3[k] && h2hFiltered.length<3) { seen3[k]=true; h2hFiltered.push(g); }
+      });
+      h2hFiltered.forEach(function(g,i){
+        var a = g.teamAScore!=null ? +g.teamAScore : (g.a!=null ? +g.a : null);
+        var b = g.teamBScore!=null ? +g.teamBScore : (g.b!=null ? +g.b : null);
+        if (a!=null) state.h2hGames[i].a=Math.round(a);
+        if (b!=null) state.h2hGames[i].b=Math.round(b);
       });
     }
-
     buildInputUI(); buildH2HUI(); saveState();
-    showFetchStatus('loading', 'Step 2/2 — fetching shooting & defensive stats from SofaScore...', [], []);
 
-    // ── CALL 2: Statistics tab via URL fetching ─────────────────
-    // Build slug helpers for SofaScore URL patterns
-    function toSlug(name) {
-      return name.toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim().replace(/\s+/g, '-');
-    }
+    // ── CALL 2: Box stats (FGA, 3PA, defFgPct, assists) ───────
+    var r2 = await callGemini(key, buildStatsPrompt(teamA,teamB,gA,gB,today),
+      'Step 2/2 — fetching FGA, 3PA, FG%, assists from ESPN/SofaScore...', true);
 
-    // Build per-game search queries with the known final score as anchor
-    var gameEntries = [];
-    gA.forEach(function(g, i) {
-      var opp = g.opponent || 'opponent';
-      gameEntries.push({
-        label: 'A' + (i+1),
-        team: teamA, opp: opp,
-        score: g.teamScore + '-' + g.oppScore,
-        date: g.date || '',
-        forA: true
-      });
-    });
-    gB.forEach(function(g, i) {
-      var opp = g.opponent || 'opponent';
-      gameEntries.push({
-        label: 'B' + (i+1),
-        team: teamB, opp: opp,
-        score: g.teamScore + '-' + g.oppScore,
-        date: g.date || '',
-        forA: false
-      });
-    });
+    console.log('Stats raw:', r2.text);
+    var box = parseStatsJson(r2.text);
 
-    var statsLines = [
-      'You are a basketball statistics extractor. Today: ' + today + '.',
-      '',
-      'Fetch each SofaScore game page below and read the STATISTICS tab.',
-      'Each URL is a search — click the correct game result matching the date and score shown.',
-      '',
-      'SOFASCORE STATISTICS TAB LAYOUT (exactly as displayed):',
-      '  Left=Home team, Right=Away team',
-      '  Row "Field goals":   LeftFGM/LeftFGA  Left%  Field goals  Right%  RightFGM/RightFGA',
-      '  Row "3 pointers":    LeftFGM/LeftFGA  Left%  3 pointers   Right%  RightFGM/RightFGA',
-      '  Row "Assists":       LeftNum   Assists   RightNum',
-      '',
-      'EXTRACTION RULES (apply for each game):',
-      '  fga = denominator of Field goals fraction for THE NAMED TEAM (e.g. 32/70 → 70)',
-      '  tpa = denominator of 3 pointers fraction for THE NAMED TEAM (e.g. 7/26 → 26)',
-      '  defFgPct = Field goals % of the OPPONENT shown as decimal (38% → 0.38)',
-      '  assistsAllowed = Assists number of the OPPONENT',
-      '  Determine home/away from the page to know which side is left vs right.',
-      ''
-    ];
-
-    gameEntries.forEach(function(e) {
-      var slug1 = toSlug(e.team);
-      var slug2 = toSlug(e.opp);
-      var searchUrl = 'https://www.sofascore.com/search#query=' + encodeURIComponent(e.team + ' ' + e.opp + ' basketball');
-      statsLines.push('--- GAME ' + e.label + ' ---');
-      statsLines.push('Named team: ' + e.team);
-      statsLines.push('Opponent:   ' + e.opp);
-      statsLines.push('Date:       ' + (e.date || 'recent'));
-      statsLines.push('Score:      ' + e.score + ' (use this to verify you found the correct game)');
-      statsLines.push('Search URL: ' + searchUrl);
-      statsLines.push('Also try:   https://www.sofascore.com/' + slug1 + '-' + slug2 + '/');
-      statsLines.push('Navigate to Statistics tab. Extract fga, tpa, defFgPct, assistsAllowed for ' + e.team + '.');
-      statsLines.push('');
-    });
-
-    statsLines.push('Return ONLY raw JSON — no markdown, no text outside braces:');
-    statsLines.push('{"gamesA":[');
-    statsLines.push('  {"fga":70,"tpa":26,"defFgPct":0.38,"assistsAllowed":14},');
-    statsLines.push('  {"fga":75,"tpa":28,"defFgPct":0.44,"assistsAllowed":19},');
-    statsLines.push('  {"fga":68,"tpa":23,"defFgPct":0.41,"assistsAllowed":17}');
-    statsLines.push('],"gamesB":[');
-    statsLines.push('  {"fga":72,"tpa":24,"defFgPct":0.45,"assistsAllowed":21},');
-    statsLines.push('  {"fga":78,"tpa":27,"defFgPct":0.42,"assistsAllowed":18},');
-    statsLines.push('  {"fga":65,"tpa":21,"defFgPct":0.46,"assistsAllowed":22}');
-    statsLines.push('],"sources":["SofaScore"]}');
-    statsLines.push('Use null only if the stat is genuinely not on the page. Do not estimate.');
-
-    var r2 = await callGemini(key, statsLines.join('\n'),
-      'Step 2/2 — reading SofaScore Statistics tabs...', true);
-
-    var boxStats = parseStatsJson(r2.text);
-    console.log('Box stats response:', r2.text);
-
-    // Apply box stats (FGA, 3PA, defFgPct, assistsAllowed)
-    function applyBoxStats(arr, stateGames, stateDef) {
-      if (!arr || !arr.length) return;
-      arr.slice(0,3).forEach(function(g, i) {
-        if (g.fga            != null && +g.fga > 0)  stateGames[i].fga  = Math.round(+g.fga);
-        if (g.tpa            != null && +g.tpa > 0)  stateGames[i].tpa  = Math.round(+g.tpa);
-        if (g.defFgPct       != null && +g.defFgPct > 0) stateDef[i].fgPct = parseFloat((+g.defFgPct).toFixed(2));
-        if (g.assistsAllowed != null && +g.assistsAllowed > 0) stateDef[i].ast = Math.round(+g.assistsAllowed);
+    function applyBox(arr, stateGames, stateDef) {
+      if (!arr||!arr.length) return;
+      arr.slice(0,3).forEach(function(g,i){
+        if (g.fga!=null&&+g.fga>0) stateGames[i].fga=Math.round(+g.fga);
+        if (g.tpa!=null&&+g.tpa>0) stateGames[i].tpa=Math.round(+g.tpa);
+        if (g.defFgPct!=null&&+g.defFgPct>0)
+          stateDef[i].fgPct=parseFloat((+g.defFgPct).toFixed(2));
+        if (g.assistsAllowed!=null&&+g.assistsAllowed>0)
+          stateDef[i].ast=Math.round(+g.assistsAllowed);
       });
     }
+    if (box&&box.gamesA) applyBox(box.gamesA, state.gamesA, state.defA);
+    if (box&&box.gamesB) applyBox(box.gamesB, state.gamesB, state.defB);
 
-    if (boxStats && boxStats.gamesA) applyBoxStats(boxStats.gamesA, state.gamesA, state.defA);
-    if (boxStats && boxStats.gamesB) applyBoxStats(boxStats.gamesB, state.gamesB, state.defB);
-
-    // Estimate any still-missing defensive stats from oppScore
-    function estimateMissing(stateGames, stateDef) {
-      stateGames.forEach(function(g, i) {
-        var os = g.os || 0;
-        if (os > 0) {
-          if (!stateDef[i].fgPct || stateDef[i].fgPct === 0) {
-            stateDef[i].fgPct = parseFloat(Math.min(0.54, Math.max(0.38, (os - 10) / (os * 2.15))).toFixed(2));
+    // Estimate any still-missing def stats from oppScore
+    [state.gamesA, state.gamesB].forEach(function(games, ti) {
+      var def = ti===0 ? state.defA : state.defB;
+      games.forEach(function(g,i){
+        if (g.os && g.os>0) {
+          if (!def[i].fgPct||def[i].fgPct===0) {
+            var est = estimateDefStats(g.os);
+            def[i].fgPct = est.fgPct;
           }
-          if (!stateDef[i].ast || stateDef[i].ast === 0) {
-            stateDef[i].ast = Math.round(Math.min(32, Math.max(14, os / 5.1)));
+          if (!def[i].ast||def[i].ast===0) {
+            var est2 = estimateDefStats(g.os);
+            def[i].ast = est2.ast;
           }
         }
       });
-    }
-    estimateMissing(state.gamesA, state.defA);
-    estimateMissing(state.gamesB, state.defB);
+    });
 
-    // Build status report
-    var filled = [], warnings = [];
-    filled.push(teamA + ': ' + gA.length + ' games');
-    filled.push(teamB + ': ' + gB.length + ' games');
-    var h2hCount = state.h2hGames.filter(function(g){ return g.a !== null; }).length;
-    if (h2hCount > 0) filled.push('H2H: ' + h2hCount + ' result(s)');
-    else warnings.push('No H2H history found');
-
-    var defAReal = boxStats && boxStats.gamesA ? boxStats.gamesA.filter(function(g){ return g && g.defFgPct != null; }).length : 0;
-    var defBReal = boxStats && boxStats.gamesB ? boxStats.gamesB.filter(function(g){ return g && g.defFgPct != null; }).length : 0;
-    if (defAReal > 0) filled.push(teamA + ' def: ' + defAReal + '/3 from SofaScore');
-    else warnings.push(teamA + ' def stats estimated from score — verify on SofaScore');
-    if (defBReal > 0) filled.push(teamB + ' def: ' + defBReal + '/3 from SofaScore');
-    else warnings.push(teamB + ' def stats estimated from score — verify on SofaScore');
-
-    var sources = [r1.model];
-    if (scores.sources) sources = sources.concat(scores.sources);
-    filled.push('Sources: ' + sources.join(', '));
+    // Build status
+    var filled=[], warnings=[];
+    filled.push(teamA+': '+gA.length+' games');
+    filled.push(teamB+': '+gB.length+' games');
+    var h2hN=state.h2hGames.filter(function(g){return g.a!==null;}).length;
+    if (h2hN>0) filled.push('H2H: '+h2hN+'/3');
+    else warnings.push('No H2H found — fill manually');
+    var defAReal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var defBReal=box&&box.gamesB?box.gamesB.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var fgaAReal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.fga!=null;}).length:0;
+    if (defAReal>0) filled.push(teamA+' def: '+defAReal+'/3 real');
+    else warnings.push(teamA+' def stats estimated — verify on SofaScore');
+    if (defBReal>0) filled.push(teamB+' def: '+defBReal+'/3 real');
+    else warnings.push(teamB+' def stats estimated — verify on SofaScore');
+    if (fgaAReal>0) filled.push('FGA/3PA: found');
+    var srcs=[r1.model];
+    if (scores.sources) srcs=srcs.concat(scores.sources.filter(function(s){return s!==r1.model;}));
+    filled.push('Sources: '+srcs.join(', '));
 
     buildInputUI(); buildH2HUI(); checkDataCompleteness(); saveState(); markAutofilled();
-
-    var q = warnings.length === 0 ? 'success' : 'partial';
+    var q=warnings.length===0?'success':'partial';
     showFetchStatus(q,
-      q === 'success'
-        ? '\u2713 ' + teamA + ' vs ' + teamB + ' fully filled! Select League Preset below.'
-        : '\u29d6 ' + teamA + ' vs ' + teamB + ' filled. Some stats estimated — check warnings.',
+      q==='success'?'\u2713 '+teamA+' vs '+teamB+' fully filled!'
+      :'\u29d6 '+teamA+' vs '+teamB+' filled. Check warnings.',
       filled, warnings);
 
   } catch(e) {
-    var isQuota = e.isQuota || (e.message && e.message.toLowerCase().includes('quota'));
+    var isQuota=e.isQuota||(e.message&&e.message.toLowerCase().includes('quota'));
     showFetchStatus('failed',
-      isQuota
-        ? 'Quota exceeded. Wait ~1 min and retry, or enable billing at aistudio.google.com.'
-        : 'Error: ' + e.message,
-      [], []);
+      isQuota?'Quota exceeded. Wait ~1 min and retry.':'Error: '+e.message,
+      [],[]);
     console.error('Gemini autofill error:', e);
   } finally {
-    if (btn) btn.disabled = false;
-    if (sp)  sp.style.display = 'none';
+    if (btn) btn.disabled=false;
+    if (sp)  sp.style.display='none';
   }
 }
 
 // ── Keep claudeAutofill as alias for backwards compat ─────────
 async function claudeAutofill() { return geminiAutofill(); }
+
 
 // modal close on overlay tap — handled in main DOMContentLoaded below
 
