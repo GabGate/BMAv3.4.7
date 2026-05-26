@@ -2549,6 +2549,31 @@ function markAutofilled() {
 
 // ── Build the prompt ──────────────────────────────────────────
 // ── Prompt 1: scores + dates (easy to find, always works) ────
+// ── Parse JSON from Gemini response (handles fences + duplicate blocks) ──
+function parseStatsJson(text) {
+  if (!text) return null;
+  var clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  var candidates = [], depth = 0, start = -1;
+  for (var i = 0; i < clean.length; i++) {
+    if (clean[i] === '{') { if (depth === 0) start = i; depth++; }
+    else if (clean[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) { candidates.push(clean.slice(start, i+1)); start = -1; }
+    }
+  }
+  candidates.sort(function(a,b){ return b.length - a.length; });
+  for (var j = 0; j < candidates.length; j++) {
+    try {
+      var obj = JSON.parse(candidates[j]);
+      if (obj && (obj.gamesA || obj.gamesB || obj.gameA || obj.gameB)) return obj;
+    } catch(_) {}
+  }
+  for (var k = 0; k < candidates.length; k++) {
+    try { return JSON.parse(candidates[k]); } catch(_) {}
+  }
+  return null;
+}
+
 function buildScoresPrompt(teamA, teamB, today) {
   return [
     'You are a basketball data assistant. Today is ' + today + '.',
