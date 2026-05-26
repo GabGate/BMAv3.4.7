@@ -2465,7 +2465,7 @@ async function testGeminiKey() {
     const names = (ld.models || []).map(function(m){ return m.name.replace('models/',''); });
     console.log('Available models:', names);
     // Step 2: try a quick generate with best available free model
-    const prefer = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite'];
+    const prefer = ['gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-2.5-flash-lite','gemini-2.0-flash-001'];
     const candidate = prefer.find(function(m){ return names.some(function(n){ return n === m || n.startsWith(m); }); }) || names.find(function(n){ return n.includes('flash'); });
     if (!candidate) { setKeyStatus('Key valid but no flash models found. Check AI Studio.', 'warn'); return; }
     setKeyStatus('Testing with ' + candidate + '…', 'warn');
@@ -2577,44 +2577,50 @@ function parseStatsJson(text) {
 function buildScoresPrompt(teamA, teamB, today) {
   return [
     'You are a basketball data assistant. Today is ' + today + '.',
-    '',
-    'Search multiple sources (SofaScore, Flashscore, ESPN, LiveScore, basketball-reference)',
-    'to find completed basketball game results.',
+    'Search SofaScore, Flashscore, ESPN and LiveScore for COMPLETED basketball games.',
     '',
     '=== TASK A: Last 3 completed games for ' + teamA + ' ===',
-    'Search: "' + teamA + ' basketball results" site:sofascore.com OR site:flashscore.com OR site:espn.com',
-    'Find the 3 most recent completed games (FT = full time) with real final scores.',
-    'Date must be on or before ' + today + '. Exclude upcoming, live, postponed, or cancelled games.',
+    'Go to SofaScore or Flashscore results page for ' + teamA + '.',
+    'List only games with status FT (Full Time) and a final score.',
+    'Dates must be BEFORE ' + today + '. Skip upcoming, live, or cancelled games.',
+    'Return the 3 most recent by date (newest first).',
+    'teamScore = ' + teamA + ' final score, oppScore = their opponent final score.',
     '',
     '=== TASK B: Last 3 completed games for ' + teamB + ' ===',
-    'Same as above for ' + teamB + '.',
+    'Same process for ' + teamB + '.',
+    'teamScore = ' + teamB + ' final score, oppScore = their opponent final score.',
     '',
-    '=== TASK C: H2H — direct meetings between ' + teamA + ' AND ' + teamB + ' ===',
-    'Search: "' + teamA + '" "' + teamB + '" basketball h2h OR "head to head"',
-    'Find ALL completed direct meetings between these two specific teams.',
-    'Sort by date descending. Return the 3 most recent. If fewer than 3 exist, return however many exist.',
-    'IMPORTANT: Both scores must appear. Skip any game without a final score.',
+    '=== TASK C: H2H — games where ' + teamA + ' played directly vs ' + teamB + ' ===',
+    'Search SofaScore H2H tab for ' + teamA + ' vs ' + teamB + '.',
+    'List completed meetings sorted newest first. Return up to 3.',
     '',
-    'RETURN FORMAT — raw JSON only, no markdown, no explanation:',
+    'CRITICAL for H2H: the fields are named after the TEAMS, not home/away position:',
+    '  ' + teamA + 'Score = the points scored BY ' + teamA + ' in that game (regardless of home/away)',
+    '  ' + teamB + 'Score = the points scored BY ' + teamB + ' in that game (regardless of home/away)',
+    'Example: if Tortona 89 - Venezia 71 on 24/05/2026:',
+    '  ' + teamA + 'Score = 71 (Venezia scored 71), ' + teamB + 'Score = 89 (Tortona scored 89)',
+    '  OR if ' + teamA + '=Venezia and ' + teamB + '=Tortona: veneziaScore=71, tortonaScore=89',
+    '',
+    'Return ONLY raw JSON — no markdown, no text outside braces:',
     '{',
     '  "gamesA": [',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":84,"oppScore":74},',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":91,"oppScore":80},',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":78,"oppScore":82}',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":84,"oppScore":74},',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":91,"oppScore":80},',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":78,"oppScore":82}',
     '  ],',
     '  "gamesB": [',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":88,"oppScore":76},',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":95,"oppScore":89},',
-    '    {"date":"YYYY-MM-DD","opponent":"Exact Team Name","teamScore":82,"oppScore":85}',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":88,"oppScore":76},',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":95,"oppScore":89},',
+    '    {"date":"YYYY-MM-DD","opponent":"OpponentName","teamScore":82,"oppScore":85}',
     '  ],',
     '  "h2hGames": [',
-    '    {"date":"YYYY-MM-DD","teamAScore":104,"teamBScore":91},',
-    '    {"date":"YYYY-MM-DD","teamAScore":89,"teamBScore":100},',
-    '    {"date":"YYYY-MM-DD","teamAScore":73,"teamBScore":98}',
+    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":71,"' + teamB + 'Score":89},',
+    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":71,"' + teamB + 'Score":82},',
+    '    {"date":"YYYY-MM-DD","' + teamA + 'Score":87,"' + teamB + 'Score":75}',
     '  ],',
     '  "sources": ["SofaScore"]',
     '}',
-    'Rules: sort each array newest-first. Use real verified scores only — no guesses.'
+    'Sort newest-first. Real verified scores only. No guesses.'
   ].join('\n');
 }
 
@@ -2786,7 +2792,16 @@ function applyStats(stats, teamA, teamB) {
 }
 
 async function callGemini(key, prompt, statusMsg, useUrlContext) {
-  var MODELS = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite'];
+  // Model list updated from actual API — best free-tier models that support googleSearch
+  // gemini-3.x are preview-only; gemini-2.5-flash is primary; fallback chain below
+  var MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash-lite-001',
+  ];
   showFetchStatus('loading', statusMsg, [], []);
   var triedWithoutUrl = false;
 
@@ -2804,7 +2819,7 @@ async function callGemini(key, prompt, statusMsg, useUrlContext) {
     var data = await res.json();
     if (!res.ok) {
       var msg = (data.error && data.error.message) ? data.error.message : ('HTTP '+res.status);
-      var isQuota = res.status===429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+      var isQuota = res.status===429 || res.status===503 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('high demand') || msg.toLowerCase().includes('overloaded');
       var isNotFound = res.status===404 || msg.toLowerCase().includes('not found');
       var isToolErr = msg.toLowerCase().includes('urlcontext') || msg.toLowerCase().includes('url_context') || (res.status===400 && withUrl);
       throw Object.assign(new Error(msg), {isQuota:isQuota, isNotFound:isNotFound, isToolErr:isToolErr});
@@ -2898,15 +2913,34 @@ async function geminiAutofill() {
       var h2h = scores.h2hGames.slice().sort(function(a,b){
         if(!a.date||!b.date) return 0; return b.date.localeCompare(a.date);
       });
-      // Take TOP 3 unique H2H by date
+      // Deduplicate by date, keep top 3 newest
       var seen3={}, h2hFiltered=[];
       h2h.forEach(function(g){
         var k = g.date||('x'+h2hFiltered.length);
         if (!seen3[k] && h2hFiltered.length<3) { seen3[k]=true; h2hFiltered.push(g); }
       });
+      // Build a lookup for all possible team-named keys in the response
+      // Gemini may return {veneziaScore:71, tortonaScore:89} or {teamAScore:71} or {a:71}
+      var teamAKey = null, teamBKey = null;
+      if (h2hFiltered.length > 0) {
+        var sampleKeys = Object.keys(h2hFiltered[0]);
+        // Find key containing teamA name (case-insensitive)
+        var tALow = teamA.toLowerCase().replace(/[^a-z]/g,'');
+        var tBLow = teamB.toLowerCase().replace(/[^a-z]/g,'');
+        sampleKeys.forEach(function(k){
+          var kl = k.toLowerCase().replace(/[^a-z]/g,'');
+          if (kl.includes(tALow) || kl.includes(tALow.slice(0,5))) teamAKey = k;
+          if (kl.includes(tBLow) || kl.includes(tBLow.slice(0,5))) teamBKey = k;
+        });
+      }
       h2hFiltered.forEach(function(g,i){
-        var a = g.teamAScore!=null ? +g.teamAScore : (g.a!=null ? +g.a : null);
-        var b = g.teamBScore!=null ? +g.teamBScore : (g.b!=null ? +g.b : null);
+        // Try team-named keys first, then generic teamAScore/teamBScore, then a/b
+        var a = teamAKey && g[teamAKey]!=null ? +g[teamAKey]
+              : g.teamAScore!=null ? +g.teamAScore
+              : g.a!=null ? +g.a : null;
+        var b = teamBKey && g[teamBKey]!=null ? +g[teamBKey]
+              : g.teamBScore!=null ? +g.teamBScore
+              : g.b!=null ? +g.b : null;
         if (a!=null) state.h2hGames[i].a=Math.round(a);
         if (b!=null) state.h2hGames[i].b=Math.round(b);
       });
