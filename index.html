@@ -2570,27 +2570,30 @@ function parseStatsJson(text) {
 // ── Prompt 1: Scores + H2H ────────────────────────────────────
 function buildScoresPrompt(teamA, teamB, today) {
   var lines = [
-    'Basketball data lookup. Today is ' + today + '.',
-    'Search SofaScore.com and Flashscore.com for COMPLETED basketball results.',
+    'Basketball data lookup. Today: ' + today + '.',
+    'Search SofaScore AND Flashscore for COMPLETED basketball results (status: FT).',
     '',
     '=== TASK 1: Last 3 completed games for ' + teamA + ' ===',
-    'Go to: https://www.sofascore.com/team/basketball/' + teamA.toLowerCase().replace(/\s+/g,'-') + '/',
-    'OR search Google: "' + teamA + ' basketball results ' + today.slice(0,7) + ' site:sofascore.com"',
-    'List all completed (FT = Full Time) games sorted newest first.',
-    'Return ONLY the 3 most recent completed games that happened BEFORE ' + today + '.',
-    'IMPORTANT: include games vs ANY opponent — do not restrict to one opponent.',
-    'CRITICAL: index 0 must be the MOST RECENT game. Do not skip the latest game.',
+    'Search: ' + teamA + ' basketball results site:sofascore.com',
+    'OR: ' + teamA + ' basketball results site:flashscore.com',
+    'Find their RESULTS page. List ALL completed games ordered by date descending.',
+    'Pick the 3 games with the MOST RECENT dates that are BEFORE ' + today + '.',
+    'These 3 games must be the LITERALLY 3 most recent — no skipping, no jumping back in time.',
+    'Consecutive games should have dates within ~14 days of each other in season.',
+    'Include ANY competition (playoffs, league, cup — all count).',
     '',
     '=== TASK 2: Last 3 completed games for ' + teamB + ' ===',
-    'Same — separate search for ' + teamB + ' results. Index 0 = most recent.',
+    'SEPARATE search specifically for ' + teamB + ' results page.',
+    'Do NOT reuse ' + teamA + ' games for this.',
+    'Same rules: 3 most recent completed games before ' + today + ', consecutive dates.',
     '',
-    '=== TASK 3: H2H — direct meetings ' + teamA + ' vs ' + teamB + ' only ===',
-    'Search: "' + teamA + ' ' + teamB + ' h2h basketball" on sofascore.com',
-    'Return up to 3 most recent completed direct matchups, newest first.',
-    'For H2H: teamAScore = points scored BY ' + teamA + ' (regardless of home/away)',
-    '         teamBScore = points scored BY ' + teamB + ' (regardless of home/away)',
+    '=== TASK 3: H2H between ' + teamA + ' AND ' + teamB + ' only ===',
+    'Search: ' + teamA + ' vs ' + teamB + ' basketball h2h sofascore',
+    'Find direct meetings only. Up to 3 most recent, newest first.',
+    'teamAScore = BY ' + teamA + ' (regardless of home/away)',
+    'teamBScore = BY ' + teamB + ' (regardless of home/away)',
     '',
-    'Return ONLY raw JSON — no markdown, no text outside the JSON:',
+    'Return ONLY raw JSON:',
     '{',
     '  "gamesA":[',
     '    {"date":"YYYY-MM-DD","opponent":"Name","teamScore":84,"oppScore":74,"home":true},',
@@ -2609,7 +2612,10 @@ function buildScoresPrompt(teamA, teamB, today) {
     '  ],',
     '  "sources":["SofaScore"]',
     '}',
-    'RULES: real scores only, newest first, any competition or league counts.'
+    'STRICT RULE: dates in gamesA must be descending. Dates in gamesB must be descending.',
+    'Verify: gamesA[0].date > gamesA[1].date > gamesA[2].date',
+    'Verify: gamesB[0].date > gamesB[1].date > gamesB[2].date',
+    'No guessing — real confirmed scores only.'
   ];
   return lines.join('\n');
 }
@@ -2836,10 +2842,23 @@ async function geminiAutofill() {
     // Sort newest-first, take top 3
     function top3(arr){
       if(!arr||!arr.length) return [];
-      return arr.slice().sort(function(a,b){
+      // Sort descending by date
+      var sorted = arr.slice().sort(function(a,b){
         if(!a.date) return 1; if(!b.date) return -1;
         return b.date.localeCompare(a.date);
-      }).slice(0,3);
+      });
+      // Keep only games within 60 days of the most recent game
+      // This prevents jumping far back in time for the 2nd or 3rd slot
+      if(sorted.length > 1 && sorted[0].date) {
+        var newestMs = new Date(sorted[0].date).getTime();
+        var cutoffMs = newestMs - (60 * 24 * 60 * 60 * 1000); // 60 days back
+        sorted = sorted.filter(function(g){
+          if(!g.date) return false;
+          var gMs = new Date(g.date).getTime();
+          return gMs >= cutoffMs;
+        });
+      }
+      return sorted.slice(0,3);
     }
     var gA=top3(scores.gamesA||[]);
     var gB=top3(scores.gamesB||[]);
@@ -2919,7 +2938,14 @@ async function geminiAutofill() {
         var side = g.home === true ? 'HOME (LEFT)' : g.home === false ? 'AWAY (RIGHT)' : 'check';
         lines.push('GAME ' + (i+1) + ': ' + teamName + ' (' + side + ') vs ' + opp);
         lines.push('  Date: ' + (g.date||'?') + ' | Score: ' + teamName + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
-        lines.push('  Search: "' + teamName + ' ' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
+        var dateStr = (g.date||'').slice(0,7);
+        var scoreStr = g.teamScore + '-' + g.oppScore;
+        lines.push('  Search these in order until you find the Statistics tab:');
+        lines.push('    1. sofascore.com ' + teamName + ' ' + opp + ' ' + dateStr + ' statistics');
+        lines.push('    2. flashscore.com ' + teamName + ' ' + opp + ' basketball ' + dateStr);
+        lines.push('    3. espn.com ' + teamName + ' ' + opp + ' basketball box score ' + dateStr);
+        lines.push('    4. ' + teamName + ' vs ' + opp + ' basketball ' + scoreStr + ' ' + g.date + ' box score');
+        lines.push('  The final score was ' + scoreStr + ' — use this to confirm you found the right game.');
         lines.push('');
       });
       lines.push('Return ONLY raw JSON — no markdown:');
