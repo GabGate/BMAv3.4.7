@@ -2882,31 +2882,104 @@ async function geminiAutofill() {
     }
     buildInputUI();buildH2HUI();saveState();
 
-    // ── CALL 2: Box stats per game ────────────────────────────
-    var r2=await callGemini(key,buildStatsPrompt(teamA,teamB,gA,gB,today),'Step 2/2 — fetching FGA, 3PA, FG%, Assists from SofaScore…',true);
-    console.log('Stats raw:',r2.text);
-    var box=parseStatsJson(r2.text);
+    // ── CALLS 2a & 2b: Box stats — one short call per team ──────
+    // Split into 2 calls so each prompt is short enough for lite models
 
-    // Apply box stats: fga, tpa, defFgPct (calculate from fgm/fga if missing), assistsAllowed
-    function applyBox(arr,sg,sd){
-      if(!arr||!arr.length) return;
+    function makeTeamStatsPrompt(teamName, games, today) {
+      var lines = [
+        'Basketball stats extractor. Today: ' + today + '.',
+        'Find shooting stats for ' + teamName + ' from these 3 games.',
+        'Search SofaScore, ESPN, Flashscore, basketball-reference for each game.',
+        '',
+        'HOW TO READ SOFASCORE STATISTICS TAB:',
+        '  Left = HOME team, Right = AWAY team.',
+        '  Row "2 pointers": HomeFGM/Home2PA  2 pointers  AwayFGM/Away2PA',
+        '  Row "3 pointers": HomeFGM/Home3PA  3 pointers  AwayFGM/Away3PA',
+        '  Row "Field goals": already summed = 2PM+3PM / 2PA+3PA',
+        '  Row "Assists": HomeAST  Assists  AwayAST',
+        '',
+        'FOR ' + teamName + ' IN EACH GAME:',
+        '  fga = ' + teamName + ' field goal attempts = 2PA + 3PA (denominators of "2 pointers" + "3 pointers")',
+        '  tpa = ' + teamName + ' 3-point attempts = denominator of "3 pointers" row',
+        '  fgm = ' + teamName + ' field goals made = 2PM + 3PM (numerators of "2 pointers" + "3 pointers")',
+        '  oppFga = opponent field goal attempts = opponent 2PA + 3PA',
+        '  oppFgm = opponent field goals made = opponent 2PM + 3PM',
+        '  defFgPct = oppFgm / oppFga  (2 decimal places, e.g. 22/60 = 0.37)',
+        '  assistsAllowed = OPPONENT assists from the "Assists" row',
+        '',
+        'REAL EXAMPLE: Tortona HOME 82-71 Venezia on 22/05/2026:',
+        '  Tortona "2 pointers": 21/40  "3 pointers": 9/25  "Assists": 15',
+        '  Venezia "2 pointers": 16/34  "3 pointers": 6/26  "Assists": 7',
+        '  If teamName=Tortona: fga=40+25=65, tpa=25, fgm=21+9=30, oppFga=34+26=60, oppFgm=16+6=22, defFgPct=22/60=0.37, assistsAllowed=7',
+        '  If teamName=Venezia: fga=34+26=60, tpa=26, fgm=16+6=22, oppFga=40+25=65, oppFgm=21+9=30, defFgPct=30/65=0.46, assistsAllowed=15',
+        ''
+      ];
+      games.forEach(function(g, i) {
+        var opp = g.opponent || 'opponent';
+        var side = g.home === true ? 'HOME (LEFT)' : g.home === false ? 'AWAY (RIGHT)' : 'check';
+        lines.push('GAME ' + (i+1) + ': ' + teamName + ' (' + side + ') vs ' + opp);
+        lines.push('  Date: ' + (g.date||'?') + ' | Score: ' + teamName + ' ' + g.teamScore + ' - ' + opp + ' ' + g.oppScore);
+        lines.push('  Search: "' + teamName + ' ' + opp + '" basketball ' + (g.date||'').slice(0,7) + ' sofascore statistics');
+        lines.push('');
+      });
+      lines.push('Return ONLY raw JSON — no markdown:');
+      lines.push('{"games":[');
+      lines.push('  {"fgm":30,"fga":65,"tpa":25,"oppFgm":22,"oppFga":60,"defFgPct":0.37,"assistsAllowed":7},');
+      lines.push('  {"fgm":28,"fga":70,"tpa":28,"oppFgm":29,"oppFga":66,"defFgPct":0.44,"assistsAllowed":21},');
+      lines.push('  {"fgm":26,"fga":68,"tpa":23,"oppFgm":28,"oppFga":68,"defFgPct":0.41,"assistsAllowed":17}');
+      lines.push(']}');
+      lines.push('Use null if not found. Compute defFgPct=oppFgm/oppFga yourself.');
+      return lines.join('\n');
+    }
+
+    function applyBox(arr, sg, sd) {
+      if (!arr||!arr.length) return;
       arr.slice(0,3).forEach(function(g,i){
-        if(g.fga!=null&&+g.fga>0)  sg[i].fga=Math.round(+g.fga);
-        if(g.tpa!=null&&+g.tpa>0)  sg[i].tpa=Math.round(+g.tpa);
-        // defFgPct: prefer direct value, then calculate from oppFgm/oppFga, then from fgm+fga (this team's opponent)
+        if (g.fga!=null&&+g.fga>0)  sg[i].fga=Math.round(+g.fga);
+        if (g.tpa!=null&&+g.tpa>0)  sg[i].tpa=Math.round(+g.tpa);
         var dp=null;
-        if(g.defFgPct!=null&&+g.defFgPct>0&&+g.defFgPct<1)
+        if (g.defFgPct!=null&&+g.defFgPct>0&&+g.defFgPct<1)
           dp=parseFloat((+g.defFgPct).toFixed(2));
-        if(!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0)
+        if (!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0)
           dp=parseFloat((+g.oppFgm/+g.oppFga).toFixed(2));
-        // Cap to sane range
-        if(dp&&(dp<0.2||dp>0.75)) dp=null;
-        if(dp) sd[i].fgPct=dp;
-        if(g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
+        // Also try fgm/fga directly (some sites return team's own FG%)
+        // but cap to sane range
+        if (dp&&(dp<0.20||dp>0.75)) dp=null;
+        if (dp) sd[i].fgPct=dp;
+        if (g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
       });
     }
-    if(box&&box.gamesA) applyBox(box.gamesA,state.gamesA,state.defA);
-    if(box&&box.gamesB) applyBox(box.gamesB,state.gamesB,state.defB);
+
+    function parseTeamBox(text) {
+      // Parse response that has {"games":[...]} or {"gamesA":[...]}
+      var j = parseStatsJson(text);
+      if (!j) return null;
+      return j.games || j.gamesA || j.gamesB || null;
+    }
+
+    var boxA = null, boxB = null;
+
+    try {
+      showFetchStatus('loading', 'Step 2a/3 — getting ' + teamA + ' shooting stats…', [], []);
+      var r2a = await callGemini(key, makeTeamStatsPrompt(teamA, gA, today),
+        'Step 2a/3 — ' + teamA + ' FGA, 3PA, FG%, Assists…', false);
+      console.log('Stats A raw:', r2a.text);
+      boxA = parseTeamBox(r2a.text);
+      if (boxA) applyBox(boxA, state.gamesA, state.defA);
+    } catch(e2a) {
+      console.warn('Stats A call failed:', e2a.message);
+    }
+
+    try {
+      showFetchStatus('loading', 'Step 2b/3 — getting ' + teamB + ' shooting stats…', [], []);
+      var r2b = await callGemini(key, makeTeamStatsPrompt(teamB, gB, today),
+        'Step 2b/3 — ' + teamB + ' FGA, 3PA, FG%, Assists…', false);
+      console.log('Stats B raw:', r2b.text);
+      boxB = parseTeamBox(r2b.text);
+      if (boxB) applyBox(boxB, state.gamesB, state.defB);
+    } catch(e2b) {
+      console.warn('Stats B call failed:', e2b.message);
+    }
 
     // Estimate anything still missing from oppScore
     [[state.gamesA,state.defA],[state.gamesB,state.defB]].forEach(function(pair){
@@ -2925,15 +2998,18 @@ async function geminiAutofill() {
     var h2hN=state.h2hGames.filter(function(g){return g.a!==null;}).length;
     if(h2hN>0) filled.push('H2H: '+h2hN+'/3');
     else warnings.push('No H2H found — fill manually');
-    var defAreal=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
-    var defBreal=box&&box.gamesB?box.gamesB.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
-    var fgaA=box&&box.gamesA?box.gamesA.filter(function(g){return g&&g.fga!=null;}).length:0;
-    if(fgaA>0) filled.push('FGA/3PA: '+fgaA+'/3 found');
-    else warnings.push('FGA/3PA not found — may need manual entry');
-    if(defAreal>0) filled.push(teamA+' FG% & assists: '+defAreal+'/3 real');
-    else warnings.push(teamA+' FG%/assists estimated');
-    if(defBreal>0) filled.push(teamB+' FG% & assists: '+defBreal+'/3 real');
-    else warnings.push(teamB+' FG%/assists estimated');
+    var defAreal=boxA?boxA.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var defBreal=boxB?boxB.filter(function(g){return g&&g.defFgPct!=null;}).length:0;
+    var fgaA=boxA?boxA.filter(function(g){return g&&g.fga!=null;}).length:0;
+    var fgaB=boxB?boxB.filter(function(g){return g&&g.fga!=null;}).length:0;
+    if(fgaA>0) filled.push(teamA+' FGA/3PA: '+fgaA+'/3');
+    else warnings.push(teamA+' FGA/3PA not found — fill manually');
+    if(fgaB>0) filled.push(teamB+' FGA/3PA: '+fgaB+'/3');
+    else warnings.push(teamB+' FGA/3PA not found — fill manually');
+    if(defAreal>0) filled.push(teamA+' FG%+assists: '+defAreal+'/3 real');
+    else warnings.push(teamA+' FG%/assists estimated from score');
+    if(defBreal>0) filled.push(teamB+' FG%+assists: '+defBreal+'/3 real');
+    else warnings.push(teamB+' FG%/assists estimated from score');
     filled.push('Source: '+r1.model);
 
     buildInputUI();buildH2HUI();checkDataCompleteness();saveState();markAutofilled();
