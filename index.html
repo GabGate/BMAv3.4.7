@@ -2961,18 +2961,37 @@ async function geminiAutofill() {
     function applyBox(arr, sg, sd) {
       if (!arr||!arr.length) return;
       arr.slice(0,3).forEach(function(g,i){
-        if (g.fga!=null&&+g.fga>0)  sg[i].fga=Math.round(+g.fga);
-        if (g.tpa!=null&&+g.tpa>0)  sg[i].tpa=Math.round(+g.tpa);
-        var dp=null;
-        if (g.defFgPct!=null&&+g.defFgPct>0&&+g.defFgPct<1)
-          dp=parseFloat((+g.defFgPct).toFixed(2));
-        if (!dp&&g.oppFgm!=null&&g.oppFga!=null&&+g.oppFga>0)
-          dp=parseFloat((+g.oppFgm/+g.oppFga).toFixed(2));
-        // Also try fgm/fga directly (some sites return team's own FG%)
-        // but cap to sane range
-        if (dp&&(dp<0.20||dp>0.75)) dp=null;
-        if (dp) sd[i].fgPct=dp;
-        if (g.assistsAllowed!=null&&+g.assistsAllowed>0) sd[i].ast=Math.round(+g.assistsAllowed);
+        // FGA and 3PA
+        if (g.fga!=null&&+g.fga>0) sg[i].fga=Math.round(+g.fga);
+        if (g.tpa!=null&&+g.tpa>0) sg[i].tpa=Math.round(+g.tpa);
+
+        // defFgPct: ALWAYS prefer computing from oppFgm/oppFga directly
+        // because it is the most accurate (opponent FGM / opponent FGA)
+        // e.g. Venezia AWAY: oppFgm=22, oppFga=60 → 22/60 = 0.37 for Tortona
+        var dp = null;
+        if (g.oppFgm!=null && g.oppFga!=null && +g.oppFga>0) {
+          // Calculate directly: opponent FGM divided by opponent FGA
+          dp = parseFloat((+g.oppFgm / +g.oppFga).toFixed(2));
+        }
+        // Fallback: use pre-computed defFgPct if oppFgm/oppFga not available
+        if (!dp && g.defFgPct!=null && +g.defFgPct>0 && +g.defFgPct<1) {
+          dp = parseFloat((+g.defFgPct).toFixed(2));
+        }
+        // Sanity check: basketball FG% is always between 25% and 72%
+        if (dp && (dp < 0.25 || dp > 0.72)) dp = null;
+        if (dp) sd[i].fgPct = dp;
+
+        // assistsAllowed: opponent assists from the Assists row
+        // Use directly if provided and valid
+        if (g.assistsAllowed!=null && +g.assistsAllowed>0) {
+          sd[i].ast = Math.round(+g.assistsAllowed);
+        }
+        // If assists null/missing, estimate from opponent score
+        // Average ~1 assist per 4.5-5 pts in European leagues
+        if (!sd[i].ast || sd[i].ast===0) {
+          var oppScore = sg[i].os || 0;
+          if (oppScore > 0) sd[i].ast = Math.round(Math.min(30, Math.max(12, oppScore / 4.8)));
+        }
       });
     }
 
